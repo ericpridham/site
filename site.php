@@ -14,11 +14,13 @@ class Site {
       throw new Exception('Could not parse INI.');
     }
 
-    foreach (glob(dirname(__FILE__).'/site/*.php') as $file) {
+    foreach (glob(dirname(__FILE__).'/*.php') as $file) {
       $component = basename($file, '.php');
-      foreach ($this->load_classes($file) as $class) {
-        if (get_parent_class($class) == 'SiteComponent') {
-          $this->components[$component] = new $class($this);
+      if ($component != 'site') {
+        foreach ($this->load_classes($file) as $class) {
+          if (get_parent_class($class) == 'SiteComponent') {
+            $this->components[$component] = new $class($this);
+          }
         }
       }
     }
