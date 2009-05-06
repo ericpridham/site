@@ -3,24 +3,22 @@ require_once('smarty/Smarty.class.php');
 
 class SiteTemplate extends SiteComponent {
   protected $smarty;
-  public function __construct($site)
-  {
-    if (!isset($site->ini['template'])) {
-      throw new Exception('Missing template settings.');
-    }
+  protected $conf;
 
-    $settings = $site->ini['template'];
+  public function __construct($conf)
+  {
+    $this->conf = $conf;
 
     $this->smarty = new Smarty();
-    $this->smarty->template_dir = $this->root_dir(@$settings['template_dir']);
-    $this->smarty->compile_dir  = $this->root_dir(@$settings['compile_dir']);
-    $this->smarty->config_dir   = $this->root_dir(@$settings['config_dir']);
-    $this->smarty->cache_dir    = $this->root_dir(@$settings['cache_dir']);
+    $this->smarty->template_dir = $this->rootDir(@$this->conf['template_dir']);
+    $this->smarty->compile_dir  = $this->rootDir(@$this->conf['compile_dir']);
+    $this->smarty->config_dir   = $this->rootDir(@$this->conf['config_dir']);
+    $this->smarty->cache_dir    = $this->rootDir(@$this->conf['cache_dir']);
 
-    parent::__construct($site);
+    parent::__construct($conf);
   }
 
-  public function root_dir($dir)
+  public function rootDir($dir)
   {
     if (!$dir) {
       return null;

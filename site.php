@@ -4,22 +4,40 @@
  */
 class Site {
   protected $components;
-  public $ini;
+  public $conf;
 
-  public function __construct($ini)
+  public function __construct($conf)
   {
-    $this->ini = parse_ini_file($ini, true);
+    $parts = pathinfo($conf);
 
-    if ($this->ini === false) {
+    switch ($parts['extension']) {
+      case 'ini':
+        $this->conf = parse_ini_file($conf, true);
+        break;
+
+      case 'yaml':
+      case 'yml':
+        require_once('spyc.php');
+        $this->conf = Spyc::YAMLLoad($conf);
+        break;
+    }
+
+    if ($this->conf === false) {
       throw new Exception('Could not parse INI.');
     }
 
-    foreach (glob(dirname(__FILE__).'/*.php') as $file) {
-      $component = basename($file, '.php');
-      if ($component != 'site') {
-        foreach ($this->load_classes($file) as $class) {
+    foreach ($this->conf as $component => $conf) {
+      $file = dirname(__FILE__)."/$component.php";
+      if (file_exists($file)) {
+        foreach ($this->loadClasses($file) as $class) {
           if (get_parent_class($class) == 'SiteComponent') {
-            $this->components[$component] = new $class($this);
+            try {
+              $this->components[$component] = new $class($conf);
+            }
+            catch (Exception $e) {
+              // do proper logging
+              echo $e->getMessage();
+            }
           }
         }
       }
@@ -35,7 +53,7 @@ class Site {
     return $this->components[$var];
   }
 
-  public function load_classes($file)
+  public function loadClasses($file)
   {
     $classes = get_declared_classes();
     require($file);

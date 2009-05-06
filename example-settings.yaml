@@ -1,0 +1,31 @@
+template:
+  template_dir: html/
+  compile_dir : var/compile/
+  config_dir  : var/config/
+  cache_dir   : var/cache/
+
+db:
+  host       : host
+  username   : username
+  password   : password
+  database   : database
+  #logging    : true
+  #log_path   : var/logs/
+  model      : true
+  models_path: inc/models/
+
+#dbs:
+#  db1:
+#    host    : host
+#    username: username
+#    password: password
+#    database: database
+#    model      : true
+#    models_path: inc/models/
+#  db2:
+#    host    : host
+#    username: username
+#    password: password
+#    database: database
+#    model      : true
+#    models_path: inc/models/
