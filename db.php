@@ -7,18 +7,87 @@ class SiteDatabase extends SiteComponent {
   private $dbh;
   private $conf;
   private $model;
-  private $ro;
 
-  public function __construct($conf)
+  public function __construct($conf, $controller = 'SiteDatabaseModelController')
   {
     $this->conf = $conf;
 
+    $this->initConnections();
+
+    if ($this->conf['model']) {
+      $this->model = new $controller($this, $this->conf['models_path']);
+    }
+
+    parent::__construct($conf);
+  }
+
+  /**
+   * Connection combinations:
+   *
+   * #1 Single DB
+   *    phptype =>
+   *    username =>
+   *    password =>
+   *    host =>
+   *    db =>
+   *
+   * #2 DB Pool
+   *    pool =>
+   *      0 => [Single DB]
+   *      1 => [Single DB]
+   *      ...
+   *
+   * #3 RO/RW Split DB
+   *    ro => [Single DB]|[DB Pool]
+   *    rw => [Single DB]|[DB Pool]
+   */
+  private function initConnections()
+  {
+    static $last_type;
+
+    // #3
+    if (isset($this->conf['ro']) && isset($this->conf['rw'])) {
+      if (isset($this->conf['ro']['pool'])) {
+        $this->dbh_ro = $this->dbConnect($this->pickFromPool($this->conf['ro']['pool']));
+      }
+      else {
+        $this->dbh_ro = $this->dbConnect($this->conf['ro']);
+      }
+      if (isset($this->conf['rw']['pool'])) {
+        $this->dbh_rw = $this->dbConnect($this->pickFromPool($this->conf['rw']['pool']));
+      }
+      else {
+        $this->dbh_rw = $this->dbConnect($this->conf['rw']);
+      }
+    }
+
+    // #2
+    elseif (isset($this->conf['pool'])) {
+      $this->dbh_ro = $this->dbConnect($this->pickFromPool($this->conf['pool']));
+      $this->dbh_rw = $this->dbh_ro;
+    }
+
+    // #1
+    else {
+      $this->dbh_ro = $this->dbConnect($this->conf);
+      $this->dbh_rw = $this->dbh_ro;
+    }
+  }
+
+  private function pickFromPool($array)
+  {
+    // random for now
+    return $array[array_rand($array)];
+  }
+
+  private function dbConnect($dbconf)
+  {
     $this->dsn = array(
-      'phptype'  => @$this->conf['phptype'],
-      'username' => @$this->conf['username'],
-      'password' => @$this->conf['password'],
-      'hostspec' => @$this->conf['host'],
-      'database' => @$this->conf['database'],
+      'phptype'  => @$dbconf['phptype'],
+      'username' => @$dbconf['username'],
+      'password' => @$dbconf['password'],
+      'hostspec' => @$dbconf['host'],
+      'database' => @$dbconf['database'],
     );
 
     if (!@$this->dsn['phptype']) {
@@ -31,29 +100,43 @@ class SiteDatabase extends SiteComponent {
       throw new Exception('Could not connect to database. (' . $dbh->getMessage() . ')');
     }
 
-    $this->dbh = $dbh;
+    $dbh->setFetchMode(MDB2_FETCHMODE_ASSOC);
+    //$dbh->setOption('debug', true);
+    $dbh->loadModule('Manager');
+    $dbh->loadModule('Extended');
+    $dbh->loadModule('Reverse');
 
-    $this->dbh->setFetchMode(MDB2_FETCHMODE_ASSOC);
-    //$this->dbh->setOption('debug', true);
-    $this->dbh->loadModule('Manager');
-    $this->dbh->loadModule('Extended');
-    $this->dbh->loadModule('Reverse');
+    return $dbh;
+  }
 
-    if ($this->conf['model']) {
-      $this->model = new SiteDatabaseModelController($this, $this->conf['models_path']);
+  public function getConnection($type)
+  {
+    //
+    // once a rw query has been made, all subsequent queries
+    // are made to the rw server.  that way updates are immediately
+    // queriable.
+    //
+    static $rw = false;
+
+    if ($rw || $type == 'rw') {
+      $rw = true;
+      return $this->dbh_rw;
     }
-
-    if ($this->conf['ro']) {
-      $this->ro = true;
+    elseif ($type == 'ro') {
+      return $this->dbh_ro;
     }
-
-    parent::__construct($conf);
+    else {
+      return null;
+    }
   }
 
   public function __destruct()
   {
-    if ($this->dbh) {
-      $this->dbh->disconnect();
+    if ($this->dbh_ro) {
+      $this->dbh_ro->disconnect();
+    }
+    if ($this->dbh_rw) {
+      $this->dbh_rw->disconnect();
     }
   }
 
@@ -69,6 +152,20 @@ class SiteDatabase extends SiteComponent {
 
   public function query($query, $values = null, $count = null, $start = null, $indexby = null)
   {
+    return $this->queryRW($query, $values, $count, $start, $indexby);
+  }
+
+  public function queryRO($query, $values = null, $count = null, $start = null, $indexby = null)
+  {
+    return $this->_query($this->getConnection('ro'), $query, $values, $count, $start, $indexby);
+  }
+  public function queryRW($query, $values = null, $count = null, $start = null, $indexby = null)
+  {
+    return $this->_query($this->getConnection('rw'), $query, $values, $count, $start, $indexby);
+  }
+
+  protected function _query($dbh, $query, $values = null, $count = null, $start = null, $indexby = null)
+  {
     $log = array();
 
     try
@@ -77,7 +174,7 @@ class SiteDatabase extends SiteComponent {
       $log['query'] = $query;
       $log['values'] = $values;
 
-      $sth = $this->dbh->prepare($query);
+      $sth = $dbh->prepare($query);
       if (MDB2::isError($sth)) {
         throw new Exception('Could not prepare query. (' . $sth->getMessage() . ')');
       }
@@ -110,6 +207,9 @@ class SiteDatabase extends SiteComponent {
       echo "<!-- ".print_r($log,true)." -->";
       file_put_contents($this->conf['log_path'] . 'queries.log', serialize($log), FILE_APPEND);
     }
+    elseif ($log['error']) {
+      throw new Exception($log['error']);
+    }
 
     return $results;
   }
@@ -117,13 +217,12 @@ class SiteDatabase extends SiteComponent {
   public function search($table_name, $values = null, $orderby = null, $count = null, $start = null, $indexby = null)
   {
     $where = array();
-    if (!is_null($values))
-    {
+    if (!is_null($values)) {
       foreach ($values as $var => $val) {
         $where[] = "$var = :$var";
       }
     }
-    return $this->query(
+    return $this->queryRO(
       "select * from $table_name"
      .(count($where)?" where " . implode(' and ', $where):'')
      .(is_null($orderby)?'':" order by $orderby"),
@@ -147,9 +246,9 @@ class SiteDatabase extends SiteComponent {
     $fields = implode(',', array_keys($row));
     $values = ':'.implode(', :', array_keys($row));
     $query = "insert into $table_name ($fields) values ($values)";
-    $this->query($query, $row);
+    $this->queryRW($query, $row);
 
-    return $this->dbh->lastInsertId();
+    return $this->dbh_rw->lastInsertId();
   }
 
   public function update($table_name, $row, $values)
@@ -169,7 +268,7 @@ class SiteDatabase extends SiteComponent {
     }
 
     $query = "update {$table_name} set $assigns where " . implode(' and ', $where);
-    $this->query($query, $update_values);
+    $this->queryRW($query, $update_values);
   }
 
   public function delete($table_name, $values)
@@ -179,27 +278,30 @@ class SiteDatabase extends SiteComponent {
       $where[] = "$var = :$var";
     }
     $query = "delete from {$table_name} where " . implode(' and ', $where);
-    $this->query($query, $values);
+    $this->queryRW($query, $values);
   }
 
   public function beginTransaction()
   {
-    $this->dbh->beginTransaction();
+    //$this->dbh_rw->beginTransaction();
+    $this->queryRW('BEGIN');
   }
 
   public function commit()
   {
-    $this->dbh->commit();
+    //$this->dbh_rw->commit();
+    $this->queryRW('COMMIT');
   }
 
   public function rollback()
   {
-    $this->dbh->rollback();
+    //$this->dbh_rw->rollback();
+    $this->queryRW('ROLLBACK');
   }
 
   public function tableInfo($table_name)
   {
-    return $this->dbh->tableInfo($table_name);
+    return $this->dbh_rw->tableInfo($table_name);
   }
 }
 

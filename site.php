@@ -9,7 +9,6 @@ class Site {
   public function __construct($conf)
   {
     $parts = pathinfo($conf);
-
     switch ($parts['extension']) {
       case 'ini':
         $this->conf = parse_ini_file($conf, true);
