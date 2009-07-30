@@ -1,0 +1,13 @@
+
+components:
+  db:
+    model: false
+    pool:
+      - host: localhost
+        username: sitetest
+        password: st123
+        database: sitetest
+      - host: localhost
+        username: sitetest
+        password: st123
+        database: sitetest

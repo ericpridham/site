@@ -1,5 +1,6 @@
 <?php
 
+// comment
 require_once('MDB2.php');
 
 class SiteDatabases extends SiteComponent {
