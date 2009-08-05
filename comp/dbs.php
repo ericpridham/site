@@ -6,6 +6,15 @@ require_once('MDB2.php');
 class SiteDatabases extends SiteComponent {
   protected $dbs;
 
+  public function init()
+  {
+    $this->defaultConf(array(
+      'result_class' => 'SiteDatabaseResult',
+      'model_class'  => 'SiteDatabaseModel',
+    ));
+  }
+
+
   public function __construct($conf)
   {
     // include required components here.  otherwise site.php picks up

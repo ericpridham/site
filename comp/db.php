@@ -40,6 +40,12 @@ class SiteDatabase extends SiteComponent {
     $this->field_info = array();
   }
 
+  // for debugging
+  public function inspect($var)
+  {
+    return $this->$var;
+  }
+
   /**
    * Initializes connections to the DB.
    *
@@ -70,13 +76,13 @@ class SiteDatabase extends SiteComponent {
     // #3
     if (isset($this->conf['ro']) && isset($this->conf['rw'])) {
       if (isset($this->conf['ro']['pool'])) {
-        $this->dbh_ro = $this->dbConnect($this->pickFromPool($this->conf['ro']['pool']));
+        $this->dbh_ro = $this->dbConnectFromPool($this->conf['ro']['pool']);
       }
       else {
         $this->dbh_ro = $this->dbConnect($this->conf['ro']);
       }
       if (isset($this->conf['rw']['pool'])) {
-        $this->dbh_rw = $this->dbConnect($this->pickFromPool($this->conf['rw']['pool']));
+        $this->dbh_rw = $this->dbConnectFromPool($this->conf['rw']['pool']);
       }
       else {
         $this->dbh_rw = $this->dbConnect($this->conf['rw']);
@@ -85,7 +91,7 @@ class SiteDatabase extends SiteComponent {
 
     // #2
     elseif (isset($this->conf['pool'])) {
-      $this->dbh_ro = $this->dbConnect($this->pickFromPool($this->conf['pool']));
+      $this->dbh_ro = $this->dbConnectFromPool($this->conf['pool']);
       $this->dbh_rw = $this->dbh_ro;
     }
 
@@ -97,20 +103,6 @@ class SiteDatabase extends SiteComponent {
   }
 
   /**
-   * Returns a connection from a DB pool determined by the decision procedure.
-   *
-   * Decision procedure is random for now.
-   *
-   * @param array $array - Array of connection configs
-   * @access protected
-   * @return array - Connection config
-   */
-  protected function pickFromPool($array)
-  {
-    return $array[array_rand($array)];
-  }
-
-  /**
    * Connects to DB.
    *
    * @param array $dbconf - DB config
@@ -119,29 +111,45 @@ class SiteDatabase extends SiteComponent {
    */
   protected function dbConnect($dbconf)
   {
-    $this->dsn = array(
-      'phptype'  => @$dbconf['phptype'],
+    $dsn = array(
+      'phptype'  => @$dbconf['phptype']?:'mysqli',
       'username' => @$dbconf['username'],
       'password' => @$dbconf['password'],
       'hostspec' => @$dbconf['host'],
       'database' => @$dbconf['database'],
     );
 
-    if (!@$this->dsn['phptype']) {
-      $this->dsn['phptype'] = 'mysqli';
-    }
-
-    $dbh =& MDB2::connect($this->dsn);
+    $dbh =& MDB2::connect($dsn);
 
     if (PEAR::isError($dbh)) {
       throw new Exception('Could not connect to database. (' . $dbh->getMessage() . ' - ' . $dbh->getUserinfo() . ')');
     }
+
+    $this->dsn = $dsn;
 
     $dbh->setFetchMode(MDB2_FETCHMODE_ASSOC);
     $dbh->setOption('debug', true);
     $dbh->loadModule('Manager');
     $dbh->loadModule('Extended');
     $dbh->loadModule('Reverse');
+
+    return $dbh;
+  }
+
+  protected function dbConnectFromPool($pool)
+  {
+    $dbh = null;
+
+    for ($i = 0; $i < count($pool) && is_null($dbh); ++$i) {
+      try {
+        $dbh = $this->dbConnect($pool[$i]);
+      }
+      catch (Exception $e) {}
+    }
+
+    if (is_null($dbh)) {
+      throw new Exception('Could not connect to database pool.');
+    }
 
     return $dbh;
   }
@@ -694,15 +702,19 @@ class SiteDatabaseModel {
       return;
     }
 
-    $model_class = "SiteDatabaseModelTable";
+    $table_class = "SiteDatabaseModelTable";
     $model_record_class = null;
 
-    $model_file = "{$_SERVER['DOCUMENT_ROOT']}{$this->tables_path}$table_name.php";
+    $model_file = "{$this->tables_path}$table_name.php";
+    if ($model_file[0] != '/') {
+      $model_file = "{$_SERVER['DOCUMENT_ROOT']}$model_file";
+    }
+
     if (file_exists($model_file)) {
       $new_classes = Site::loadClasses($model_file);
       foreach ($new_classes as $class) {
         if (get_parent_class($class) == 'SiteDatabaseModelTable') {
-          $model_class = $class;
+          $table_class = $class;
         }
         elseif (get_parent_class($class) == 'SiteDatabaseModelRecord') {
           $model_record_class = $class;
@@ -710,7 +722,7 @@ class SiteDatabaseModel {
       }
     }
 
-    $this->tables[$table_name] = new $model_class($this, $table_name, $model_record_class);
+    $this->tables[$table_name] = new $table_class($this, $table_name, $model_record_class);
   }
 }
 
@@ -824,7 +836,7 @@ class SiteDatabaseModelRecord implements SiteDatabaseRecordWrapper {
    */
   public function __construct($table, $row = null, $exists = false, $dirty = false)
   {
-    if (@get_class($table) != 'SiteDatabaseModelTable') {
+    if (!is_a($table, 'SiteDatabaseModelTable')) {
       throw new Exception('Invalid ModelTable parameter.');
     }
     $this->table = $table;
@@ -846,11 +858,15 @@ class SiteDatabaseModelRecord implements SiteDatabaseRecordWrapper {
   {
     $this->freshen();
 
-    if (!isset($this->row[$var])) {
-      return null;
+    if (isset($this->changes[$var])) {
+      return $this->changes[$var];
     }
 
-    return $this->row[$var];
+    if (isset($this->row[$var])) {
+      return $this->row[$var];
+    }
+
+    return null;
   }
 
   // for debugging
@@ -867,7 +883,8 @@ class SiteDatabaseModelRecord implements SiteDatabaseRecordWrapper {
 
   public function __set($var, $val)
   {
-    return $this->row[$var] = $val;
+    return $this->changes[$var] = $val;
+    //return $this->row[$var] = $val;
   }
 
   public function freshen($force = false)
@@ -884,7 +901,7 @@ class SiteDatabaseModelRecord implements SiteDatabaseRecordWrapper {
         throw new Exception("Can't freshen row.  Record does not exist.");
       }
 
-      $this->update($f->getRow());
+      $this->row = $f->getRow();
     }
     $this->dirty = false;
   }
@@ -939,6 +956,7 @@ class SiteDatabaseModelRecord implements SiteDatabaseRecordWrapper {
     }
     $this->exists = true;
     $this->dirty = true;
+    $this->changes = array();
   }
 
   public function delete()
@@ -950,6 +968,8 @@ class SiteDatabaseModelRecord implements SiteDatabaseRecordWrapper {
     }
 
     $this->table->delete($key);
+    $this->exists = false;
+    $this->dirty = false;
   }
 
   public function updateAndSave($row)
