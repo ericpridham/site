@@ -1,21 +1,7 @@
 <?php
 require_once('PHPUnit/Framework.php');
 require_once(dirname(__FILE__).'/../site.php');
-
-function newConf($name, $conf_str)
-{
-  file_put_contents(getConf($name), $conf_str);
-}
-
-function getConf($name)
-{
-  return dirname(__FILE__)."/$name.yaml";
-}
-
-function killConf($name)
-{
-  unlink(getConf($name));
-}
+require_once('testing.php');
 
 Site::loadClasses(dirname(__FILE__).'/../comp/db.php');
 class MyWrapClass implements SiteDatabaseRecordWrapper {

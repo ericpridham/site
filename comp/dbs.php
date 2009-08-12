@@ -8,21 +8,12 @@ class SiteDatabases extends SiteComponent {
 
   public function init()
   {
-    $this->defaultConf(array(
-      'result_class' => 'SiteDatabaseResult',
-      'model_class'  => 'SiteDatabaseModel',
-    ));
-  }
-
-
-  public function __construct($conf)
-  {
     // include required components here.  otherwise site.php picks up
     // on the new SiteComponent class and things get messed up.
     require_once('db.php');
 
-    foreach ($conf as $dbname => $dbconf) {
-      $this->dbs[$dbname] = new SiteDatabase($dbconf);
+    foreach ($this->conf as $dbname => $dbconf) {
+      $this->dbs[$dbname] = new SiteDatabase($this->site, $dbconf);
     }
   }
 

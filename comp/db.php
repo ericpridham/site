@@ -219,7 +219,7 @@ class SiteDatabase extends SiteComponent {
         return $this->model;
       }
       else {
-        $tbl = $this->model->$var;
+        $tbl = @$this->model->$var;
         if ($tbl) {
           return $tbl;
         }

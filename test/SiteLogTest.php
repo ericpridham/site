@@ -5,7 +5,6 @@ require_once(dirname(__FILE__).'/../site.php');
 class SiteLogTest extends PHPUnit_Framework_TestCase {
   public function setUp()
   {
-    //file_put_contents(dirname(__FILE__).'/blank.yaml', "");
   }
 
   public function testLogging()
@@ -27,7 +26,6 @@ class SiteLogTest extends PHPUnit_Framework_TestCase {
 
   public function tearDown()
   {
-    //unlink(dirname(__FILE__).'/blank.yaml');
   }
 }
 ?>

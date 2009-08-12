@@ -72,8 +72,7 @@ class Site {
     }
     foreach ($this->loadClasses($file) as $class) {
       if (get_parent_class($class) == 'SiteComponent') {
-        $handle = @$conf['_handle']?:$component;
-        $this->components[$handle] = new $class($this, $conf);
+        $this->components[$component] = new $class($this, $conf);
       }
     }
 
