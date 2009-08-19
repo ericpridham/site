@@ -707,7 +707,7 @@ class SiteDatabaseModel {
 
     $model_file = "{$this->tables_path}$table_name.php";
     if ($model_file[0] != '/') {
-      $model_file = "{$_SERVER['DOCUMENT_ROOT']}$model_file";
+      $model_file = "{$_SERVER['DOCUMENT_ROOT']}/$model_file";
     }
 
     if (file_exists($model_file)) {

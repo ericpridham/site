@@ -93,7 +93,7 @@ class Site {
     return $this->conf[$var] = $val;
   }
 
-  protected function defaultConf($var, $val = null)
+  public function defaultConf($var, $val = null)
   {
     $this->conf = $this->arrayDefaults($this->conf, $var, $val);
   }
