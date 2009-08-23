@@ -98,6 +98,11 @@ class Site {
     $this->conf = $this->arrayDefaults($this->conf, $var, $val);
   }
 
+  public function getRoot()
+  {
+    return $this->getConf('root_path');
+  }
+
   /* Utility Functions */
 
   public function findFile($file, $paths)

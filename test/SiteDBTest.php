@@ -379,6 +379,8 @@ components:
     $res = $site->db->_model->search('st', array('str' => 'row2'));
     $this->assertEquals(1, $res->count());
     $this->assertType('SiteDatabaseModelRecord', $res[0]);
+    $this->assertEquals(true, $res[0]->inspect('exists'));
+    $this->assertEquals(false, $res[0]->inspect('dirty'));
 
     $res = $site->db->_model->search('st', null, 'str desc');
     $this->assertEquals(2, $res->count());

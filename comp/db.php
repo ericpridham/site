@@ -648,7 +648,7 @@ class SiteDatabaseModel {
     $res = $this->db->search($table_name, $conditions, $orderby);
     $o = $this;
     $res->setWrapFunc(function ($row) use ($o, $table_name) {
-      return $o->create($table_name, $row, /*exists=*/true, /*dirty=*/true);
+      return $o->create($table_name, $row, /*exists=*/true);
     });
 
     return $res;
@@ -664,7 +664,7 @@ class SiteDatabaseModel {
     );
     $o = $this;
     $res->setWrapFunc(function ($row) use ($o, $table_name) {
-      return $o->create($table_name, $row, /*exists=*/true, /*dirty=*/true);
+      return $o->create($table_name, $row, /*exists=*/true);
     });
     return $res;
   }
@@ -706,7 +706,7 @@ class SiteDatabaseModel {
     $model_record_class = null;
 
     $model_file = "{$this->tables_path}$table_name.php";
-    if ($model_file[0] != '/') {
+    if ($model_file[0] != '/' && $_SERVER['DOCUMENT_ROOT']) {
       $model_file = "{$_SERVER['DOCUMENT_ROOT']}/$model_file";
     }
 
