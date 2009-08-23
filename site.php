@@ -98,9 +98,9 @@ class Site {
     $this->conf = $this->arrayDefaults($this->conf, $var, $val);
   }
 
-  public function getRoot()
+  public function root($path = null)
   {
-    return $this->getConf('root_path');
+    return $this->getConf('root_path').$path;
   }
 
   /* Utility Functions */
@@ -175,6 +175,15 @@ class SiteComponent {
   protected function defaultConf($var, $val = null)
   {
     $this->conf = $this->site->arrayDefaults($this->conf, $var, $val);
+  }
+
+  protected function assertConfSet($vars)
+  {
+    foreach ($vars as $var) {
+      if (!isset($this->conf[$var])) {
+        throw new Exception("Missing config option '$var'.");
+      }
+    }
   }
 }
 ?>

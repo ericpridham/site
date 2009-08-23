@@ -6,26 +6,17 @@ class SiteTemplate extends SiteComponent {
 
   public function init()
   {
+    $this->assertConfSet(array(
+      'template_dir', 'compile_dir', 'config_dir', 'cache_dir'
+    ));
+
     $this->smarty = new Smarty();
-    $this->smarty->template_dir = $this->rootDir(@$this->conf['template_dir']);
-    $this->smarty->compile_dir  = $this->rootDir(@$this->conf['compile_dir']);
-    $this->smarty->config_dir   = $this->rootDir(@$this->conf['config_dir']);
-    $this->smarty->cache_dir    = $this->rootDir(@$this->conf['cache_dir']);
+    $this->smarty->template_dir = $this->site->root($this->conf['template_dir']);
+    $this->smarty->compile_dir  = $this->site->root($this->conf['compile_dir']);
+    $this->smarty->config_dir   = $this->site->root($this->conf['config_dir']);
+    $this->smarty->cache_dir    = $this->site->root($this->conf['cache_dir']);
 
     parent::__construct($conf);
-  }
-
-  public function rootDir($dir)
-  {
-    if (!$dir) {
-      return null;
-    }
-
-    if ($dir{0} == '/') {
-      return $dir;
-    }
-
-    return "{$_SERVER['DOCUMENT_ROOT']}/$dir";
   }
 
   public function __get($var)

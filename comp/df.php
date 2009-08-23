@@ -1,25 +1,25 @@
 <?php
 
 class SiteDataFilesController extends SiteComponent {
-  protected $root_path;
+  protected $data_root;
 
   public function init()
   {
-    if (!isset($this->conf['root_path'])) {
-      throw Exception("Missing required config option 'root_path'.");
+    if (!isset($this->conf['data_root'])) {
+      throw Exception("Missing required config option 'data_root'.");
     }
 
-    $this->root_path = $this->site->getRoot() . "/{$this->conf['root_path']}";
+    $this->data_root = $this->site->root($this->conf['data_root']);
 
-    if (!is_dir($this->root_path)) {
-      throw Exception("Invalid path '{$this->root_path}'.");
+    if (!is_dir($this->data_root)) {
+      throw Exception("Invalid path '{$this->data_root}'.");
     }
   }
 
   public function __get($var)
   {
     switch ($var) {
-      $path = "{$this->root_path}/$var";
+      $path = "{$this->data_root}/$var";
       if (is_dir($path)) {
         return new SiteDataFiles($this, $path);
       }
