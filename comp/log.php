@@ -11,11 +11,17 @@ class SiteLog extends SiteComponent implements Iterator, ArrayAccess, Serializab
 
   public function log($type, $msg, $extra = null)
   {
+    $bt = array();
+    foreach(debug_backtrace(false) as $line) {
+      unset($line['args']);
+      $bt[] = $line;
+    }
     $this->log[] = array(
       'type'  => $type,
       'msg'   => $msg,
       'ts'    => microtime(true),
       'extra' => $extra,
+      'bt'    => $bt,
     );
   }
 
