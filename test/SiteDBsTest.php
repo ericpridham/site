@@ -18,10 +18,10 @@ components:
     rw:
       model: true
       pool:
-        - host: localhost-
-          username: sitetest
-          password: st123
-          database: sitetest_rw1
+        - host: localhost
+          username: fake
+          password: fake
+          database: fake
         - host: localhost
           username: sitetest
           password: st123
@@ -37,6 +37,7 @@ components:
     $site = new Site(getConf('dbs'));
     $this->assertType('SiteDatabase', $site->dbs->rw);
     $this->assertType('SiteDatabase', $site->dbs->ro);
+    $this->assertFalse($site->dbs->rw === $site->dbs->ro);
     $this->assertType('null', $site->dbs->notadb);
 
     killConf('dbs');

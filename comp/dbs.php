@@ -23,6 +23,14 @@ class SiteDatabases extends SiteComponent {
       return $this->dbs[$var];
     }
   }
+
+  public function __destruct()
+  {
+    foreach ($this->dbs as $db => $x) {
+      unset($this->dbs[$db]);
+    }
+    unset($this->dbs);
+  }
 }
 
 ?>

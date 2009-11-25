@@ -154,6 +154,14 @@ class Site {
     $r = $f();
     return microtime(true) - $s;
   }
+
+  public function __destruct()
+  {
+    foreach ($this->components as $name => $c)
+    {
+      unset($this->components[$name]);
+    }
+  }
 }
 
 class SiteComponent {
@@ -184,6 +192,11 @@ class SiteComponent {
         throw new Exception("Missing config option '$var'.");
       }
     }
+  }
+
+  public function __destruct()
+  {
+    unset($this->site);
   }
 }
 ?>

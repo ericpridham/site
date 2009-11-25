@@ -15,8 +15,6 @@ class SiteTemplate extends SiteComponent {
     $this->smarty->compile_dir  = $this->site->root($this->conf['compile_dir']);
     $this->smarty->config_dir   = $this->site->root($this->conf['config_dir']);
     $this->smarty->cache_dir    = $this->site->root($this->conf['cache_dir']);
-
-    parent::__construct($conf);
   }
 
   public function __get($var)

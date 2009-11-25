@@ -11,7 +11,8 @@ require_once('MDB2.php');
  */
 class SiteDatabase extends SiteComponent {
   protected $dns;
-  protected $dbh;
+  protected $dbh_ro;
+  protected $dbh_rw;
   protected $conf;
   protected $model;
   protected $field_info;
@@ -210,6 +211,7 @@ class SiteDatabase extends SiteComponent {
     if ($this->dbh_rw) {
       $this->dbh_rw->disconnect();
     }
+    parent::__destruct();
   }
 
   public function __get($var)
@@ -600,6 +602,11 @@ class SiteDatabaseModel {
     $this->tables_path = $tables_path;
   }
 
+  public function __destruct()
+  {
+    unset($this->db);
+  }
+
   public function __get($table_name)
   {
     $this->initModel($table_name);
@@ -747,6 +754,11 @@ class SiteDatabaseModelTable {
     $this->rel_cache = array();
   }
 
+  public function __destruct()
+  {
+    unset($this->model);
+  }
+
   public function getFieldInfo($sub = null)
   {
     return $this->model->getFieldInfo($this->table_name, $sub);
@@ -852,6 +864,12 @@ class SiteDatabaseModelRecord implements SiteDatabaseRecordWrapper {
     $this->dirty = $dirty;
 
     $this->changes = array();
+  }
+
+  public function __destruct()
+  {
+    unset($this->table);
+    unset($this->row);
   }
 
   public function __get($var)

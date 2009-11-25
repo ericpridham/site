@@ -679,7 +679,7 @@ components:
   db:
     model: false
     pool:
-      - host: nowhere.example.com
+      - host: localhost
         username: wronguser
         password: wrongpass
         database: wrongdb
@@ -711,16 +711,17 @@ components:
   /**
     * @expectedException Exception
     **/
+
   public function testSingleDBEx()
   {
     newConf('single_db_ex', '
 components:
   db:
     model: false
-    host: nowhere.example.com
-    username: sitetest
-    password: st123
-    database: sitetest_rw1
+    host: localhost
+    username: wronguser
+    password: wrongpass
+    database: wrongdb
 '
     );
 
@@ -741,14 +742,14 @@ components:
   db:
     model: false
     pool:
-      - host: nowhere.example.com
-        username: sitetest
-        password: st123
-        database: sitetest_rw1
-      - host: nowhere.example.com
-        username: sitetest
-        password: st123
-        database: sitetest_rw2
+      - host: localhost
+        username: wronguser
+        password: wrongpass
+        database: wrongdb
+      - host: localhost
+        username: wronguser
+        password: wrongpass
+        database: wrondb
 '
     );
 
