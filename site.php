@@ -40,6 +40,7 @@ class Site {
     }
 
     $this->loadComponent('log');
+    $this->loadComponent('env');
   }
 
   public function __get($var)

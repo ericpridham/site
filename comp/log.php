@@ -41,6 +41,7 @@ class SiteLog extends SiteComponent implements Iterator, ArrayAccess, Serializab
       case 'warn':
       case 'error':
       case 'debug':
+      case 'query':
         array_unshift($args, $name);
         return call_user_func_array(array($this,'log'), $args);
     }
@@ -62,5 +63,20 @@ class SiteLog extends SiteComponent implements Iterator, ArrayAccess, Serializab
   /* Serializable interface */
   public function serialize() { return serialize($this->log); }
   public function unserialize($d) { $this->log = unserialize($d); }
+
+  public function printToScreen()
+  {
+    echo "<pre>\n\n";
+    $last = null;
+    foreach ($this->get() as $row) {
+      if (is_null($last)) {
+        $last = $row['ts'];
+      }
+      echo number_format($row['ts'] - $last, 2) . "s: ({$row['type']}) {$row['msg']}\n";
+      $last = $row['ts'];
+    }
+    echo "</pre>";
+
+  }
 }
 ?>

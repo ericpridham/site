@@ -120,7 +120,7 @@ class SiteDatabase extends SiteComponent {
       'database' => @$dbconf['database'],
     );
 
-    $dbh =& MDB2::connect($dsn);
+    $dbh = MDB2::connect($dsn);
 
     if (PEAR::isError($dbh)) {
       throw new Exception('Could not connect to database. (' . $dbh->getMessage() . ' - ' . $dbh->getUserinfo() . ')');
@@ -275,11 +275,11 @@ class SiteDatabase extends SiteComponent {
     }
     catch (Exception $e) {
       $log['error'] = $e->getMessage();
-      $this->site->log->log('query', $query, $log);
+      $this->site->log->query("[{$this->dsn['database']}] $query", $log);
       throw $e;
     }
 
-    $this->site->log->log('query', $query, $log);
+    $this->site->log->query("[{$this->dsn['database']}] $query ({$log['numrows']} rows in ".number_format($log['runtime'], 2)."s)", $log);
     return $results;
   }
 
