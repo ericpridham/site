@@ -806,7 +806,7 @@ class SiteDatabaseModelTable {
     return $this->model->delete($this->table_name, $conditions);
   }
 
-  public function all($orderby)
+  public function all($orderby = null)
   {
     return $this->model->all($this->table_name, $orderby);
   }
