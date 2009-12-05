@@ -269,6 +269,9 @@ class SiteDatabase extends SiteComponent {
       if (!MDB2::isError($nr)) {
         $log['numrows'] = $nr;
       }
+      else {
+        $log['numrows'] = '?';
+      }
 
       $c = $this->conf['result_class'];
       $results = new $c($res, $count, $start);
@@ -643,9 +646,9 @@ class SiteDatabaseModel {
     return $this->create($table_name, $row, /*exists=*/true);
   }
 
-  public function all($table_name)
+  public function all($table_name, $orderby = null)
   {
-    return $this->search($table_name);
+    return $this->search($table_name, null, $orderby);
   }
 
   public function search($table_name, $conditions = null, $orderby = null)
@@ -803,9 +806,9 @@ class SiteDatabaseModelTable {
     return $this->model->delete($this->table_name, $conditions);
   }
 
-  public function all()
+  public function all($orderby)
   {
-    return $this->model->search($this->table_name);
+    return $this->model->all($this->table_name, $orderby);
   }
 
   public function search($conditions = null, $orderby = null)
