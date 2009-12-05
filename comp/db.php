@@ -392,9 +392,10 @@ interface SiteDatabaseRecordWrapper {
  *
  * @uses Iterator
  * @uses ArrayAccess
+ * @uses Countable
  * @package Site
  */
-class SiteDatabaseResult implements Iterator, ArrayAccess {
+class SiteDatabaseResult implements Iterator, ArrayAccess, Countable {
   protected $res;
   protected $start;
   protected $count;
@@ -554,6 +555,7 @@ class SiteDatabaseResult implements Iterator, ArrayAccess {
     }
   }
 
+  /* Countable interface */
   public function count()
   {
     return $this->count;
