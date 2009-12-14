@@ -72,7 +72,7 @@ class Site {
       );
     }
     foreach ($this->loadClasses($file) as $class) {
-      if (get_parent_class($class) == 'SiteComponent') {
+      if (is_subclass_of($class, 'SiteComponent')) {
         $this->components[$component] = new $class($this, $conf);
       }
     }
