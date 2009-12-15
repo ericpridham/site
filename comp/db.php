@@ -725,10 +725,10 @@ class SiteDatabaseModel {
     if (file_exists($model_file)) {
       $new_classes = Site::loadClasses($model_file);
       foreach ($new_classes as $class) {
-        if (get_parent_class($class) == 'SiteDatabaseModelTable') {
+        if (is_subclass_of($class, 'SiteDatabaseModelTable')) {
           $table_class = $class;
         }
-        elseif (get_parent_class($class) == 'SiteDatabaseModelRecord') {
+        elseif (is_subclass_of($class, 'SiteDatabaseModelRecord')) {
           $model_record_class = $class;
         }
       }
