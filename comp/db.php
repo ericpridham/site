@@ -283,7 +283,7 @@ class SiteDatabase extends SiteComponent {
       throw $e;
     }
 
-    $this->site->log->query("[{$this->dsn['database']}] $query ({$log['numrows']} rows in ".number_format($log['runtime'], 2)."s)", $log);
+    $this->site->log->query("[{$this->dsn['database']}] $query " . ($values?print_r($values,true):'') . "({$log['numrows']} rows in ".number_format($log['runtime'], 2)."s)", $log);
     return $results;
   }
 
