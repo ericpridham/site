@@ -118,6 +118,8 @@ class SiteDatabase extends SiteComponent {
       'password' => @$dbconf['password'],
       'hostspec' => @$dbconf['host'],
       'database' => @$dbconf['database'],
+      'new_link' => true, // we always want new connections to create their own
+                          // link resources
     );
 
     $dbh = MDB2::connect($dsn);
