@@ -649,16 +649,16 @@ class SiteDatabaseModel {
     return $this->create($table_name, $row, /*exists=*/true);
   }
 
-  public function all($table_name, $orderby = null)
+  public function all($table_name, $orderby = null, $count = null, $start = null, $indexby = null)
   {
-    return $this->search($table_name, null, $orderby);
+    return $this->search($table_name, null, $orderby, $count, $start, $indexby);
   }
 
-  public function search($table_name, $conditions = null, $orderby = null)
+  public function search($table_name, $conditions = null, $orderby = null, $count = null, $start = null, $indexby = null)
   {
     $this->initModel($table_name);
 
-    $res = $this->db->search($table_name, $conditions, $orderby);
+    $res = $this->db->search($table_name, $conditions, $orderby, $count, $start, $indexby);
     $o = $this;
     $res->setWrapFunc(function ($row) use ($o, $table_name) {
       return $o->create($table_name, $row, /*exists=*/true);
@@ -809,14 +809,14 @@ class SiteDatabaseModelTable {
     return $this->model->delete($this->table_name, $conditions);
   }
 
-  public function all($orderby = null)
+  public function all($orderby = null, $count = null, $start = null, $indexby = null)
   {
-    return $this->model->all($this->table_name, $orderby);
+    return $this->model->all($this->table_name, $orderby, $count, $start, $indexby);
   }
 
-  public function search($conditions = null, $orderby = null)
+  public function search($conditions = null, $orderby = null, $count = null, $start = null, $indexby = null)
   {
-    return $this->model->search($this->table_name, $conditions, $orderby);
+    return $this->model->search($this->table_name, $conditions, $orderby, $count, $start, $indexby);
   }
 
   public function searchRelated($table_name, $conditions = null, $orderby = null)
