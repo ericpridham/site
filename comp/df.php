@@ -131,9 +131,11 @@ class SiteDataFiles {
   public function get($conditions)
   {
     if (is_string($conditions)) {
-      $path = "{$this->_files_path}/$conditions";
-      if (!is_dir($path)) {
-        return new SiteDataFile($this, $path);
+      if (preg_match('/[0-9a-z_.]+/i', $conditions)) {
+        $path = "{$this->_files_path}/$conditions";
+        if (file_exists($path) && !is_dir($path)) {
+          return new SiteDataFile($this, $path);
+        }
       }
     }
     elseif (is_array($conditions)) {
