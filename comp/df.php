@@ -171,7 +171,7 @@ class SiteDataFile {
 
     $this->_headers = array();
 
-    $fullStr = file_get_contents($this->_filename)."\n"/*explode below fails without this*/;
+    $fullStr = file_get_contents($this->_filename);//."\n"/*explode below fails without this*/;
     list ($metasStr, $text) = explode("\n\n", $fullStr, 2);
 
     if (is_null($text)) {
@@ -210,6 +210,20 @@ class SiteDataFile {
       $this->loadFile();
     }
     return $this->_headers;
+  }
+
+  public function __get($var)
+  {
+    if (!$this->_loaded) {
+      $this->loadFile();
+    }
+    switch ($var) {
+      case 'content':
+        return $this->_content;
+
+      default:
+        return @$this->_headers[$var];
+    }
   }
 }
 

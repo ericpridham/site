@@ -24,7 +24,7 @@ class SiteDFTest extends PHPUnit_Framework_TestCase {
     file_put_contents(dirname(__FILE__).'/files/test/testfile', 'Title: A Bing-a-bong
 Bar Biz: Bang
 
-
+Content
 ');
 
     $site = new Site(getConf('df'));
@@ -33,6 +33,10 @@ Bar Biz: Bang
 
     $f = $site->df->test->get(array('title' => 'A Bing-a-bong'));
     $this->assertType('SiteDataFile', $f);
+
+    $this->assertEquals($f->title,   'A Bing-a-bong');
+    $this->assertEquals($f->bar_biz, 'Bang');
+    $this->assertEquals($f->content, "Content\n");
 
     $f = $site->df->test->get(array('title' => 'Not-a-Title'));
     $this->assertNull($f);
