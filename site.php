@@ -179,6 +179,11 @@ class SiteComponent {
     $this->init();
   }
 
+  public function getSite()
+  {
+    return $this->site;
+  }
+
   protected function init()
   {
     // placeholder

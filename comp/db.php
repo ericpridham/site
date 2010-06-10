@@ -608,6 +608,10 @@ class SiteDatabaseModel {
 
     $this->db = $database;
     $this->tables_path = $tables_path;
+
+    if ($this->tables_path[0] != '/') {
+      $this->tables_path = $this->db->getSite()->root($this->tables_path);
+    }
   }
 
   public function __destruct()
