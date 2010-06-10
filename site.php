@@ -62,6 +62,9 @@ class Site {
 
     $paths = array(dirname(__FILE__).'/comp/'); // core
     if (isset($this->conf['addon_path'])) {
+      if ($this->conf['addon_path'][0] != '/') {
+        $this->conf['addon_path'] = $this->root($this->conf['addon_path']);
+      }
       $paths = array_merge($paths, explode(':', $this->conf['addon_path']));
     }
 
