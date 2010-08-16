@@ -302,15 +302,13 @@ class SiteDatabase extends SiteComponent {
   public function exec($function, $args = null, $count = null, $start = null, $indexby = null)
   {
     $argstr  = '';
-    $argvals = array();
     foreach ($args as $var => $val) {
       if (!is_null($val) && $val !== '') {
-        $argstr .= ($argstr?', ':'') . "@p$var = ?";
-        $argvals[] = $val;
+        $argstr .= ($argstr?', ':'') . "@$var = :$var";
       }
     }
     return $this->queryRW(
-      "EXEC $function $argstr", $argvals, $count, $start, $indexby
+      "EXEC $function $argstr", $args, $count, $start, $indexby
     );
   }
 
