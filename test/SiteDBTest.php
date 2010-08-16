@@ -101,45 +101,45 @@ components:
     $this->assertEquals(true, $ret);
 
     // search
-    $res = $site->db->search('st', array('id' => $id2));
+    $res = $site->db->search('st', 'id = :id', array('id' => $id2));
     $this->assertEquals(1, $res->count());
     $this->assertType('array', $res[0]);
     $this->assertEquals('row2', $res[0]['str']);
 
-    $res = $site->db->search('st', array('id' => -99));
+    $res = $site->db->search('st', 'id = :id', array('id' => -99));
     $this->assertEquals(0, $res->count());
     $this->assertType('null', $res[0]);
 
     // getFirst
-    $res = $site->db->getFirst('noautoinc', array('pk' => 2));
+    $res = $site->db->getFirst('noautoinc', 'pk = :pk', array('pk' => 2));
     $this->assertType('array', $res);
     $this->assertEquals('row1', $res['str']);
 
     // update
-    $site->db->update('st', array('id' => $id1), array('str' => 'row1-updated'));
-    $res = $site->db->getFirst('st', array('id' => $id1));
+    $site->db->update('st', 'id = :id', array('id' => $id1), array('str' => 'row1-updated'));
+    $res = $site->db->getFirst('st', 'id = :id', array('id' => $id1));
     $this->assertEquals('row1-updated', $res['str']);
 
     // delete
-    $site->db->delete('st', array('id' => $id2));
-    $res = $site->db->getFirst('st', array('id' => $id2));
+    $site->db->delete('st', 'id = :id', array('id' => $id2));
+    $res = $site->db->getFirst('st', 'id = :id', array('id' => $id2));
     $this->assertType('null', $res);
 
     // transactions
     $site->db->beginTransaction();
     $id3 = $site->db->insert('st', array('str' => 'row3'));
-    $res = $site->db->getFirst('st', array('id' => $id3));
+    $res = $site->db->getFirst('st', 'id = :id', array('id' => $id3));
     $this->assertType('array', $res);
     $site->db->rollback();
-    $res = $site->db->getFirst('st', array('id' => $id3));
+    $res = $site->db->getFirst('st', 'id = :id', array('id' => $id3));
     $this->assertType('null', $res);
 
     $site->db->beginTransaction();
     $id3 = $site->db->insert('st', array('str' => 'row3'));
-    $res = $site->db->getFirst('st', array('id' => $id3));
+    $res = $site->db->getFirst('st', 'id = :id', array('id' => $id3));
     $this->assertType('array', $res);
     $site->db->commit();
-    $res = $site->db->getFirst('st', array('id' => $id3));
+    $res = $site->db->getFirst('st', 'id = :id', array('id' => $id3));
     $this->assertType('array', $res);
 
     //print_r($site->log->get());
@@ -361,9 +361,9 @@ components:
     $id2 = $site->db->insert('st', array('str' => 'row2'));
 
     // get
-    $rec = $site->db->_model->get('st', array('id' => $id1));
+    $rec = $site->db->_model->get('st', 'id = :id', array('id' => $id1));
     $this->assertType('SiteDatabaseModelRecord', $rec);
-    $rec = $site->db->_model->get('st', array('id' => -99));
+    $rec = $site->db->_model->get('st', 'id = :id', array('id' => -99));
     $this->assertType('null', $rec);
 
     // all
@@ -376,24 +376,23 @@ components:
     $this->assertType('SiteDatabaseModelRecord', $res[0]);
 
     // search
-    $res = $site->db->_model->search('st', array('str' => 'row2'));
+    $res = $site->db->_model->search('st', 'str = :str', array('str' => 'row2'));
     $this->assertEquals(1, $res->count());
     $this->assertType('SiteDatabaseModelRecord', $res[0]);
     $this->assertEquals(true, $res[0]->inspect('exists'));
     $this->assertEquals(false, $res[0]->inspect('dirty'));
 
-    $res = $site->db->_model->search('st', null, 'str desc');
+    $res = $site->db->_model->search('st', null, null, 'str desc');
     $this->assertEquals(2, $res->count());
     $x = $res[1]->getRow();
     $this->assertType('array', $x);
     $this->assertEquals('row1', $x['str']);
 
-    $res = $site->db->_model->search('st', array('str' => 'doesntexist'));
+    $res = $site->db->_model->search('st', 'str = :str', array('str' => 'doesntexist'));
     $this->assertEquals(0, $res->count());
     $this->assertType('null', $res[0]);
 
-    //query
-    $res = $site->db->_model->query('st', 'str <> :str', array('str' => 'row2'));
+    $res = $site->db->_model->search('st', 'str <> :str', array('str' => 'row2'));
     $this->assertEquals(1, $res->count());
     $this->assertType('SiteDatabaseModelRecord', $res[0]);
     $x = $res[0]->getRow();
@@ -406,14 +405,14 @@ components:
     $this->assertEquals('row3', $x['str']);
 
     // update
-    $rec = $site->db->_model->update('st', array('id' => $rec->id), array('str' => 'row3-updated'));
+    $rec = $site->db->_model->update('st', 'id = :id', array('id' => $rec->id), array('str' => 'row3-updated'));
     $this->assertType('SiteDatabaseModelRecord', $rec);
     $x = $rec->getRow();
     $this->assertEquals('row3-updated', $x['str']);
 
     // delete
-    $site->db->_model->delete('st', array('id' => $rec->id));
-    $res = $site->db->_model->search('st', array('id' => $rec->id));
+    $site->db->_model->delete('st', 'id = :id', array('id' => $rec->id));
+    $res = $site->db->_model->search('st', 'id = :id', array('id' => $rec->id));
     $this->assertEquals(0, $res->count());
     $this->assertType('null', $res[0]);
 
@@ -472,9 +471,9 @@ components:
     $id2 = $site->db->insert('st', array('str' => 'row2'));
 
     // get
-    $rec = $site->db->st->get(array('id' => $id1));
+    $rec = $site->db->st->get('id = :id', array('id' => $id1));
     $this->assertType('SiteDatabaseModelRecord', $rec);
-    $rec = $site->db->st->get(array('id' => -99));
+    $rec = $site->db->st->get('id = :id', array('id' => -99));
     $this->assertType('null', $rec);
 
     // all
@@ -487,22 +486,21 @@ components:
     $this->assertType('SiteDatabaseModelRecord', $res[0]);
 
     // search
-    $res = $site->db->st->search(array('str' => 'row2'));
+    $res = $site->db->st->search('str = :str', array('str' => 'row2'));
     $this->assertEquals(1, $res->count());
     $this->assertType('SiteDatabaseModelRecord', $res[0]);
 
-    $res = $site->db->st->search(null, 'str desc');
+    $res = $site->db->st->search(null, null, 'str desc');
     $this->assertEquals(2, $res->count());
     $x = $res[1]->getRow();
     $this->assertType('array', $x);
     $this->assertEquals('row1', $x['str']);
 
-    $res = $site->db->st->search(array('str' => 'doesntexist'));
+    $res = $site->db->st->search('str = :str', array('str' => 'doesntexist'));
     $this->assertEquals(0, $res->count());
     $this->assertType('null', $res[0]);
 
-    //query
-    $res = $site->db->st->query('str <> :str', array('str' => 'row2'));
+    $res = $site->db->st->search('str <> :str', array('str' => 'row2'));
     $this->assertEquals(1, $res->count());
     $this->assertType('SiteDatabaseModelRecord', $res[0]);
     $x = $res[0]->getRow();
@@ -515,14 +513,14 @@ components:
     $this->assertEquals('row3', $x['str']);
 
     // update
-    $rec = $site->db->st->update(array('id' => $rec->id), array('str' => 'row3-updated'));
+    $rec = $site->db->st->update('id = :id', array('id' => $rec->id), array('str' => 'row3-updated'));
     $this->assertType('SiteDatabaseModelRecord', $rec);
     $x = $rec->getRow();
     $this->assertEquals('row3-updated', $x['str']);
 
     // delete
-    $site->db->st->delete(array('id' => $rec->id));
-    $res = $site->db->st->search(array('id' => $rec->id));
+    $site->db->st->delete('id = :id', array('id' => $rec->id));
+    $res = $site->db->st->search('id = :id', array('id' => $rec->id));
     $this->assertEquals(0, $res->count());
     $this->assertType('null', $res[0]);
 
@@ -573,7 +571,7 @@ components:
     $this->assertEquals('row1', $rec->str);
     $this->assertEquals(array(), $rec->inspect('changes'));
 
-    $x = $site->db->st->get(array('id' => $rec->id));
+    $x = $site->db->st->get('id = :id', array('id' => $rec->id));
     $this->assertType('SiteDatabaseModelRecord', $x);
 
     $rec->delete();
@@ -581,11 +579,11 @@ components:
     $this->assertEquals(false, $rec->inspect('dirty'));
     $this->assertEquals('row1', $rec->str);
 
-    $x = $site->db->st->get(array('id' => $rec->id));
+    $x = $site->db->st->get('id = :id', array('id' => $rec->id));
     $this->assertEquals(null, $x);
 
     $rec->save();
-    $x = $site->db->st->get(array('id' => $rec->id));
+    $x = $site->db->st->get('id = :id', array('id' => $rec->id));
     $this->assertType('SiteDatabaseModelRecord', $x);
 
     $rec = new SiteDatabaseModelRecord($site->db->st, array('str' => 'row1'), true);
@@ -629,7 +627,7 @@ components:
     $this->assertType('MyModelClass', $site->db->_model);
 
     $id1 = $site->db->insert('st', array('str' => 'row1'));
-    $res = $site->db->search('st', array('id' => $id1));
+    $res = $site->db->search('st', 'id = :id', array('id' => $id1));
     $this->assertType('MyResultClass', $res);
 
     if (!file_exists(dirname(__FILE__).'/tables/')) {

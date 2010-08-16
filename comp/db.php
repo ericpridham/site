@@ -289,25 +289,19 @@ class SiteDatabase extends SiteComponent {
     return $results;
   }
 
-  public function search($table_name, $conditions = null, $orderby = null, $count = null, $start = null, $indexby = null)
+  public function search($table_name, $where = null, $values = null, $orderby = null, $count = null, $start = null, $indexby = null)
   {
-    $where = '';
-    if (!is_null($conditions)) {
-      foreach ($conditions as $var => $val) {
-        $where .= ($where?' and ':'') . "$var = :$var";
-      }
-    }
     return $this->queryRO(
       "select * from $table_name"
      .($where?" where $where":'')
      .(is_null($orderby)?'':" order by $orderby")
-     ,$conditions, $count, $start, $indexby
+     ,$values, $count, $start, $indexby
     );
   }
 
-  public function getFirst($table_name, $conditions = null)
+  public function getFirst($table_name, $where = null, $values = null)
   {
-    $res = $this->search($table_name, $conditions);
+    $res = $this->search($table_name, $where, $values);
 
     if (!$res->count()) {
       return null;
@@ -331,30 +325,20 @@ class SiteDatabase extends SiteComponent {
     return true;
   }
 
-  public function update($table_name, $conditions, $update_values)
+  public function update($table_name, $where, $values, $update_values)
   {
     $assigns = '';
     foreach ($update_values as $var => $val) {
       $assigns .= ($assigns?', ':'') . "$var = :$var";
     }
 
-    $where = '';
-    foreach ($conditions as $var => $val) {
-      $where .= ($where?' and ':'') . "$var = :w_$var";
-      $update_values["w_$var"] = $val;
-    }
-
     $this->queryRW(
-      "update $table_name set $assigns where $where", $update_values
+      "update $table_name set $assigns where $where", array_merge($values, $update_values)
     );
   }
 
-  public function delete($table_name, $values)
+  public function delete($table_name, $where, $values)
   {
-    $where = '';
-    foreach ($values as $var => $val) {
-      $where .= ($where?' and ':'') . "$var = :$var";
-    }
     $this->queryRW("delete from $table_name where $where", $values);
   }
 
@@ -642,11 +626,11 @@ class SiteDatabaseModel {
     return $this->tables[$table_name]->getRecordClass();
   }
 
-  public function get($table_name, $conditions)
+  public function get($table_name, $where, $values = null)
   {
     $this->initModel($table_name);
 
-    $row = $this->db->getFirst($table_name, $conditions);
+    $row = $this->db->getFirst($table_name, $where, $values);
 
     if (is_null($row)) {
       return null;
@@ -657,34 +641,19 @@ class SiteDatabaseModel {
 
   public function all($table_name, $orderby = null, $count = null, $start = null, $indexby = null)
   {
-    return $this->search($table_name, null, $orderby, $count, $start, $indexby);
+    return $this->search($table_name, null, null, $orderby, $count, $start, $indexby);
   }
 
-  public function search($table_name, $conditions = null, $orderby = null, $count = null, $start = null, $indexby = null)
+  public function search($table_name, $where = null, $values = null, $orderby = null, $count = null, $start = null, $indexby = null)
   {
     $this->initModel($table_name);
 
-    $res = $this->db->search($table_name, $conditions, $orderby, $count, $start, $indexby);
+    $res = $this->db->search($table_name, $where, $values, $orderby, $count, $start, $indexby);
     $o = $this;
     $res->setWrapFunc(function ($row) use ($o, $table_name) {
       return $o->create($table_name, $row, /*exists=*/true);
     });
 
-    return $res;
-  }
-
-  public function query($table_name, $where, $values = null, $orderby = null)
-  {
-    $this->initModel($table_name);
-    $res = $this->db->query(
-      "select * from $table_name where $where"
-      . ($orderby?" order by $orderby":'')
-      ,$values
-    );
-    $o = $this;
-    $res->setWrapFunc(function ($row) use ($o, $table_name) {
-      return $o->create($table_name, $row, /*exists=*/true);
-    });
     return $res;
   }
 
@@ -700,19 +669,19 @@ class SiteDatabaseModel {
     return $this->create($table_name, $row, /*exists=*/true, /*dirty=*/true);
   }
 
-  public function update($table_name, $conditions, $row)
+  public function update($table_name, $where, $values, $row)
   {
     $this->initModel($table_name);
 
-    $this->db->update($table_name, $conditions, $row);
+    $this->db->update($table_name, $where, $values, $row);
 
-    return $this->create($table_name, array_merge($conditions, $row), /*exists=*/true, /*dirty=*/true);
+    return $this->create($table_name, array_merge($values, $row), /*exists=*/true, /*dirty=*/true);
   }
 
-  public function delete($table_name, $conditions)
+  public function delete($table_name, $where, $values)
   {
     $this->initModel($table_name);
-    $this->db->delete($table_name, $conditions);
+    $this->db->delete($table_name, $where, $values);
   }
 
   protected function initModel($table_name)
@@ -787,17 +756,18 @@ class SiteDatabaseModelTable {
     return $this->record_class;
   }
 
-  public function get($conditions)
+  public function get($where, $values = null)
   {
-    return $this->model->get($this->table_name, $conditions);
+    return $this->model->get($this->table_name, $where, $values);
   }
 
-  public function getRelated($table_name, $conditions)
+  public function getRelated($table_name, $where, $values)
   {
-    if (!isset($this->rel_cache[$table_name.'-'.serialize($conditions)])) {
-      $this->rel_cache[$table_name.'-'.serialize($conditions)] = $this->model->get($table_name, $conditions);
+    $cache_key = $table_name.'-'.$where.serialize($values);
+    if (!isset($this->rel_cache[$cache_key])) {
+      $this->rel_cache[$cache_key] = $this->model->get($table_name, $where, $values);
     }
-    return $this->rel_cache[$table_name.'-'.serialize($conditions)];
+    return $this->rel_cache[$cache_key];
   }
 
   public function insert($row)
@@ -805,14 +775,14 @@ class SiteDatabaseModelTable {
     return $this->model->insert($this->table_name, $row);
   }
 
-  public function update($conditions, $row)
+  public function update($where, $values, $row)
   {
-    return $this->model->update($this->table_name, $conditions, $row);
+    return $this->model->update($this->table_name, $where, $values, $row);
   }
 
-  public function delete($conditions)
+  public function delete($where, $values)
   {
-    return $this->model->delete($this->table_name, $conditions);
+    return $this->model->delete($this->table_name, $where, $values);
   }
 
   public function all($orderby = null, $count = null, $start = null, $indexby = null)
@@ -820,19 +790,14 @@ class SiteDatabaseModelTable {
     return $this->model->all($this->table_name, $orderby, $count, $start, $indexby);
   }
 
-  public function search($conditions = null, $orderby = null, $count = null, $start = null, $indexby = null)
+  public function search($where = null, $values = null, $orderby = null, $count = null, $start = null, $indexby = null)
   {
-    return $this->model->search($this->table_name, $conditions, $orderby, $count, $start, $indexby);
+    return $this->model->search($this->table_name, $where, $values, $orderby, $count, $start, $indexby);
   }
 
-  public function searchRelated($table_name, $conditions = null, $orderby = null)
+  public function searchRelated($table_name, $where = null, $values = null, $orderby = null)
   {
-    return $this->model->search($table_name, $conditions, $orderby);
-  }
-
-  public function query($where, $values = null, $orderby = null)
-  {
-    return $this->model->query($this->table_name, $where, $values, $orderby);
+    return $this->model->search($table_name, $where, $values, $orderby);
   }
 
   public function queryRelated($table_name, $where, $values = null, $orderby = null)
@@ -926,7 +891,12 @@ class SiteDatabaseModelRecord implements SiteDatabaseRecordWrapper {
         throw new Exception("Can't freshen row.  No key inc values set.");
       }
 
-      $f = $this->table->get($key);
+      $where = '';
+      foreach ($key as $var => $val) {
+        $where .= ($where?' and ':'') . "$var = :$var";
+      }
+
+      $f = $this->table->get($where, $key);
       if (is_null($f)) {
         throw new Exception("Can't freshen row.  Record does not exist.");
       }
@@ -977,7 +947,12 @@ class SiteDatabaseModelRecord implements SiteDatabaseRecordWrapper {
         throw new Exception("Can't update row.  No key values set.");
       }
 
-      $this->table->update($key, $this->changes);
+      $where = '';
+      foreach ($key as $var => $val) {
+        $where .= ($where?' and ':'') . "$var = :$var";
+      }
+
+      $this->table->update($where, $key, $this->changes);
       $this->row = array_merge($this->row, $this->changes);
     }
     else {
@@ -997,7 +972,12 @@ class SiteDatabaseModelRecord implements SiteDatabaseRecordWrapper {
       throw new Exception("Can't delete row.  No key values set.");
     }
 
-    $this->table->delete($key);
+    $where = '';
+    foreach ($key as $var => $val) {
+      $where .= ($where?' and ':'') . "$var = :$var";
+    }
+
+    $this->table->delete($where, $key);
     $this->exists = false;
     $this->dirty = false;
   }
