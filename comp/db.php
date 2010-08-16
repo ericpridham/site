@@ -131,7 +131,7 @@ class SiteDatabase extends SiteComponent {
     $this->dsn = $dsn;
 
     $dbh->setFetchMode(MDB2_FETCHMODE_ASSOC);
-    $dbh->setOption('debug', true);
+    $dbh->setOption('debug', false);
     $dbh->setOption('portability', MDB2_PORTABILITY_ALL^MDB2_PORTABILITY_FIX_CASE);
     $dbh->loadModule('Manager');
     $dbh->loadModule('Extended');
