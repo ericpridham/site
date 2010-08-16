@@ -299,6 +299,21 @@ class SiteDatabase extends SiteComponent {
     );
   }
 
+  public function exec($function, $args = null, $count = null, $start = null, $indexby = null)
+  {
+    $argstr  = '';
+    $argvals = array();
+    foreach ($args as $var => $val) {
+      if (!is_null($val) && $val !== '') {
+        $argstr .= ($argstr?', ':'') . "@p$var = ?";
+        $argvals[] = $val;
+      }
+    }
+    return $this->queryRW(
+      "EXEC $function $argstr", $argvals, $count, $start, $indexby
+    );
+  }
+
   public function getFirst($table_name, $where = null, $values = null)
   {
     $res = $this->search($table_name, $where, $values);
