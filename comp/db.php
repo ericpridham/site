@@ -16,6 +16,7 @@ class SiteDatabase extends SiteComponent {
   protected $conf;
   protected $model;
   protected $field_info;
+  protected $log_queries;
 
   //
   // once a rw query has been made, all subsequent queries
@@ -29,6 +30,7 @@ class SiteDatabase extends SiteComponent {
     $this->defaultConf(array(
       'result_class' => 'SiteDatabaseResult',
       'model_class'  => 'SiteDatabaseModel',
+      'log_queries'  => true,
     ));
 
     $this->initConnections();
@@ -39,6 +41,8 @@ class SiteDatabase extends SiteComponent {
     }
 
     $this->field_info = array();
+
+    $this->log_queries = $this->conf['log_queries'];
   }
 
   // for debugging
@@ -101,6 +105,11 @@ class SiteDatabase extends SiteComponent {
       $this->dbh_ro = $this->dbConnect($this->conf);
       $this->dbh_rw = $this->dbh_ro;
     }
+  }
+
+  public function logQueries($do_log)
+  {
+    $this->log_queries = $do_log;
   }
 
   /**
@@ -285,7 +294,10 @@ class SiteDatabase extends SiteComponent {
       throw $e;
     }
 
-    $this->site->log->query("[{$this->dsn['database']}] $query " . ($values?print_r($values,true):'') . "({$log['numrows']} rows in ".number_format($log['runtime'], 2)."s)", $log);
+    if ($this->log_queries) {
+      $this->site->log->query("[{$this->dsn['database']}] $query " . ($values?print_r($values,true):'') . "({$log['numrows']} rows in ".number_format($log['runtime'], 2)."s)", $log);
+    }
+
     return $results;
   }
 
