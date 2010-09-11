@@ -85,8 +85,8 @@ class EnvironmentComponent extends SiteComponent
             $value = null;
           }
           else {
-            // accept comma-delimited values as an array
-            $value = explode(',', $value);
+            // accept comma/newline delimited string
+            $value = preg_split('/[,\n]/', $value);
           }
         }
         $valid = is_array($value);
