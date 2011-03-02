@@ -179,14 +179,43 @@ class SiteComponent {
     $this->init();
   }
 
+  protected function init()
+  {
+    // placeholder
+  }
+
   public function getSite()
   {
     return $this->site;
   }
 
-  protected function init()
+  public function getConf($var = null)
   {
-    // placeholder
+    if (is_null($var)) {
+      return $this->conf;
+    }
+    return @$this->conf[$var];
+  }
+
+  public function setConf($var, $val = null)
+  {
+    if (is_array($var)) {
+      $vars = $var;
+    }
+    else {
+      $vars = array($var => $val);
+    }
+
+    foreach ($vars as $k => $v) {
+      $this->conf[$k] = $v;
+    }
+
+    if (is_array($var)) {
+      return $var;
+    }
+    else {
+      return $val;
+    }
   }
 
   protected function defaultConf($var, $val = null)
