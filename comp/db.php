@@ -268,7 +268,7 @@ class SiteDatabase extends SiteComponent {
 
       $sth = $dbh->prepare($query);
       if (MDB2::isError($sth)) {
-        throw new Exception('Could not prepare query. (' . $res->getMessage() . ' - ' . $res->getUserinfo() . ')');
+        throw new Exception('Could not prepare query. (' . $sth->getMessage() . ' - ' . $sth->getUserinfo() . ')');
       }
 
       $res = $sth->execute($values);
@@ -684,6 +684,11 @@ class SiteDatabaseModel {
     return $res;
   }
 
+  public function exec($function, $args = null, $count = null, $start = null, $indexby = null)
+  {
+    return $this->db->exec($function, $args, $count, $start, $indexby);
+  }
+
   public function insert($table_name, $row)
   {
     $this->initModel($table_name);
@@ -820,6 +825,11 @@ class SiteDatabaseModelTable {
   public function search($where = null, $values = null, $orderby = null, $count = null, $start = null, $indexby = null)
   {
     return $this->model->search($this->table_name, $where, $values, $orderby, $count, $start, $indexby);
+  }
+
+  public function exec($function, $args = null, $count = null, $start = null, $indexby = null)
+  {
+    return $this->model->exec($function, $args, $count, $start, $indexby);
   }
 
   public function searchRelated($table_name, $where = null, $values = null, $orderby = null)
