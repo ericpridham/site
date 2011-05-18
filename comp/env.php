@@ -136,8 +136,21 @@ class EnvironmentComponent extends SiteComponent
     }
   }
 
-  public function set($var, $val, $source = 'all')
+  public function set($source, $var, $val)
   {
+    if (isset($this->env[$source])) {
+      $this->env[$source][$var] = $val;
+    }
+
+    switch ($source) {
+      case 'session':
+        $_SESSION[$var] = $val;
+        break;
+
+      case 'cookie':
+        setcookie($var, $val);
+        break;
+    }
   }
 }
 ?>
