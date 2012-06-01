@@ -5,23 +5,40 @@ require_once('MDB2.php');
 
 class SiteDatabases extends SiteComponent {
   protected $dbs;
+  protected $startup_queries;
 
   public function init()
+  {
+    // don't initialize any database connections here ...
+    $this->dbs = array();
+    $this->startup_queries = array();
+  }
+
+  public function setStartupQueries($queries)
+  {
+    $this->startup_queries = $queries;
+  }
+
+  public function __get($var)
   {
     // include required components here.  otherwise site.php picks up
     // on the new SiteComponent class and things get messed up.
     require_once('db.php');
 
-    foreach ($this->conf as $dbname => $dbconf) {
-      $this->dbs[$dbname] = new SiteDatabase($this->site, $dbconf);
+    // ... initialize the connections here instead, so that we only open
+    // connections to databases that we use
+    if (!isset($this->dbs[$var])) {
+      if (isset($this->conf[$var])) {
+        $this->site->log->debug("DBs: Connecting to DB '$var'");
+        $this->dbs[$var] = new SiteDatabase($this->site, $this->conf[$var]);
+        if (!empty($this->startup_queries)) {
+          foreach ($this->startup_queries as $query) {
+            $this->dbs[$var]->query($query);
+          }
+        }
+      }
     }
-  }
-
-  public function __get($var)
-  {
-    if (isset($this->dbs[$var])) {
-      return $this->dbs[$var];
-    }
+    return $this->dbs[$var];
   }
 
   public function __destruct()
