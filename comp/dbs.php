@@ -30,7 +30,13 @@ class SiteDatabases extends SiteComponent {
     if (!isset($this->dbs[$var])) {
       if (isset($this->conf[$var])) {
         $this->site->log->debug("DBs: Connecting to DB '$var'");
-        $this->dbs[$var] = new SiteDatabase($this->site, $this->conf[$var]);
+
+        $conf = $this->conf[$var];
+        if (isset($this->conf['result_class'])) {$conf['result_class'] = $this->conf['result_class']; }
+        if (isset($this->conf['model_class']))  {$conf['model_class']  = $this->conf['model_class']; }
+        if (isset($this->conf['log_queries']))  {$conf['log_queries']  = $this->conf['log_queries']; }
+
+        $this->dbs[$var] = new SiteDatabase($this->site, $conf);
         if (!empty($this->startup_queries)) {
           foreach ($this->startup_queries as $query) {
             $this->dbs[$var]->query($query);
