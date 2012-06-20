@@ -32,6 +32,7 @@ class SiteDatabases extends SiteComponent {
         $this->site->log->debug("DBs: Connecting to DB '$var'");
 
         $conf = $this->conf[$var];
+        if (isset($this->conf['classes_file'])) {$conf['classes_file'] = $this->conf['classes_file']; }
         if (isset($this->conf['result_class'])) {$conf['result_class'] = $this->conf['result_class']; }
         if (isset($this->conf['model_class']))  {$conf['model_class']  = $this->conf['model_class']; }
         if (isset($this->conf['log_queries']))  {$conf['log_queries']  = $this->conf['log_queries']; }
