@@ -1,4 +1,15 @@
 <?php
+if (!function_exists('is_assoc')) {
+  function is_assoc($array)
+  {
+    if (!is_array($array) || empty($array)) {
+      return false;
+    }
+    $keys = array_keys($array);
+    return array_keys($keys) !== $keys;
+  }
+}
+
 class Site {
   protected $components;
   public $conf;

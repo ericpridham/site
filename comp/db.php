@@ -339,14 +339,51 @@ class SiteDatabase extends SiteComponent {
 
   public function insert($table_name, $row)
   {
-    $this->queryRW(
-       "insert into $table_name (".implode(',', array_keys($row)).")"
-      ." values (:".implode(', :', array_keys($row)) . ")"
-      ,$row
-    );
+    if (!is_array($row) || empty($row)) {
+      throw new Exception('Invalid row parameter.');
+    }
 
-    if ($this->getFieldInfo($table_name, 'auto')) {
-      return $this->dbh_rw->lastInsertId();
+    // single record insert
+    if (is_assoc($row)) {
+      $this->queryRW(
+         "insert into $table_name (".implode(',', array_keys($row)).")"
+        ." values (:".implode(', :', array_keys($row)) . ")"
+        ,$row
+      );
+
+      if ($this->getFieldInfo($table_name, 'auto')) {
+        return $this->dbh_rw->lastInsertId();
+      }
+    }
+    else {
+      // validate batch insert
+      foreach ($row as $r) {
+        if (empty($r) || !is_assoc($r)) {
+          throw new Exception('Invalid row parameter.');
+        }
+        if (!isset($fields)) {
+          $fields = array_keys($r);
+        }
+        else {
+          $d = array_diff($fields, array_keys($r));
+          if (!empty($d)) {
+            throw new Exception('Batch insert fields mismatch.');
+          }
+        }
+      }
+
+      $keys = array_keys($row[0]);
+      $inserts = '';
+      $values = array();
+      foreach ($row as $r) {
+        $inserts .= ($inserts?' UNION ALL ':'')
+                  . 'SELECT ?' . str_repeat(',?', count($keys)-1);
+        // being pedantic about ensuring sort order
+        foreach ($keys as $k) {
+          $values[] = $r[$k];
+        }
+      }
+      $this->queryRW("insert into $table_name (".implode(',', $keys).") $inserts", $values);
     }
 
     return true;
