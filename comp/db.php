@@ -33,16 +33,42 @@ class SiteDatabase extends SiteComponent {
       'log_queries'  => true,
     ));
 
+    // class file is a source file to include that contains class overrides for
+    // result_class, model_class, record_class etc.  there's a chicken/egg problem
+    // with just providing a class name, so here we have db.php do the include
+    if (@$this->conf['classes_file']) {
+      $this->loadClassesFile($this->conf['classes_file']);
+    }
+
     $this->initConnections();
 
-    if ($this->conf['model']) {
+    if (@$this->conf['model']) {
       $c = $this->conf['model_class'];
-      $this->model = new $c($this, @$this->conf['tables_path']);
+      $this->model = new $c($this, @$this->conf['tables_path'], @$this->conf['model_record_class']);
     }
 
     $this->field_info = array();
 
     $this->log_queries = $this->conf['log_queries'];
+  }
+
+  public function loadClassesFile($classes_file)
+  {
+    $new_classes = Site::loadClasses($classes_file);
+    foreach ($new_classes as $class) {
+      if (is_subclass_of($class, 'SiteDatabaseResult')) {
+        $this->conf['result_class'] = $class;
+      }
+      elseif (is_subclass_of($class, 'SiteDatabaseModel')) {
+        $this->conf['model_class'] = $class;
+      }
+      elseif (is_subclass_of($class, 'SiteDatabaseModelRecord')) {
+        $this->conf['model_record_class'] = $class;
+      }
+      elseif (in_array('SiteDatabaseRecordWrapper', class_implements($class))) {
+        $this->conf['record_class'] = $class;
+      }
+    }
   }
 
   // for debugging
@@ -228,7 +254,7 @@ class SiteDatabase extends SiteComponent {
 
   public function __get($var)
   {
-    if ($this->conf['model']) {
+    if (@$this->conf['model']) {
       if ($var == '_model') {
         return $this->model;
       }
@@ -286,7 +312,7 @@ class SiteDatabase extends SiteComponent {
       }
 
       $c = $this->conf['result_class'];
-      $results = new $c($res, $count, $start);
+      $results = new $c($res, $count, $start, @$this->conf['record_class']);
     }
     catch (Exception $e) {
       $log['error'] = $e->getMessage();
@@ -647,8 +673,9 @@ class SiteDatabaseModel {
   protected $fields;
   protected $tables;
   protected $tables_path;
+  protected $model_record_class;
 
-  public function __construct($database, $tables_path)
+  public function __construct($database, $tables_path, $model_record_class = null)
   {
     if (!$database) {
       throw new Exception('Model component requires database component.');
@@ -656,6 +683,7 @@ class SiteDatabaseModel {
 
     $this->db = $database;
     $this->tables_path = $tables_path;
+    $this->model_record_class = $model_record_class;
 
     if ($this->tables_path[0] != '/') {
       $this->tables_path = $this->db->getSite()->root($this->tables_path);
@@ -760,7 +788,7 @@ class SiteDatabaseModel {
     }
 
     $table_class = "SiteDatabaseModelTable";
-    $model_record_class = null;
+    $model_record_class = $this->model_record_class;
 
     $model_file = "{$this->tables_path}$table_name.php";
     if ($model_file[0] != '/' && $_SERVER['DOCUMENT_ROOT']) {
@@ -809,6 +837,11 @@ class SiteDatabaseModelTable {
     unset($this->model);
   }
 
+  public function getTableName()
+  {
+    return $this->table_name;
+  }
+
   public function getFieldInfo($sub = null)
   {
     return $this->model->getFieldInfo($this->table_name, $sub);
@@ -817,6 +850,9 @@ class SiteDatabaseModelTable {
   public function create($row = null, $exists = false, $dirty = false)
   {
     $c = $this->record_class;
+    if (is_object($row) && class_implements($row, 'SiteDatabaseRecordWrapper')) {
+      $row = $row->getRow();
+    }
     return new $c($this, $row, $exists, $dirty);
   }
 
@@ -1060,6 +1096,18 @@ class SiteDatabaseModelRecord implements SiteDatabaseRecordWrapper {
   {
     $this->update($row);
     $this->save();
+  }
+
+  public function __toString()
+  {
+    /*
+    $str = '';
+    foreach ($this->row as $k => $v) {
+      $str .= "$k => $v\n";
+    }
+    return $str;
+    */
+    return get_class($this);
   }
 }
 
