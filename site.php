@@ -5,6 +5,7 @@ if (!function_exists('is_assoc')) {
     if (!is_array($array) || empty($array)) {
       return false;
     }
+
     $keys = array_keys($array);
     return array_keys($keys) !== $keys;
   }
@@ -31,8 +32,10 @@ class Site {
       case 'yaml':
       case 'yml':
         //$this->conf = Horde_Yaml::loadFile($conf);
-        require_once('spyc/spyc.php');
-        $this->conf = Spyc::YAMLLoad($conf);
+        //require_once('spyc/spyc.php');
+        //$this->conf = Spyc::YAMLLoad($conf);
+        $this->conf = yaml_parse_file($conf);
+        //die((microtime(true)-$tstart)*1000.0);
         break;
     }
 
@@ -48,6 +51,23 @@ class Site {
     }
     else {
       $this->conf['root_path'] = $_SERVER['DOCUMENT_ROOT'];
+    }
+
+    // normalize
+    $this->conf['root_path'] = realpath($this->conf['root_path']);
+
+    if (!$this->conf['root_path']) {
+      throw new Exception('root_path invalid or not set.');
+    }
+
+    if (isset($this->conf['tmp_path'])) {
+      $this->conf['tmp_path'] = realpath($this->conf['tmp_path']);
+      if (!$this->conf['tmp_path']) {
+        throw new Exception('tmp_path invalid or not set.');
+      }
+      if (!file_exists($this->conf['tmp_path'].'/upload')) {
+        mkdir($this->conf['tmp_path'].'/upload', 0777, true);
+      }
     }
 
     $this->loadComponent('log');
@@ -90,6 +110,9 @@ class Site {
         $this->components[$component] = new $class($this, $conf);
       }
     }
+    if (!isset($this->components[$component])) {
+      throw new Exception("Could not load component $component.");
+    }
 
     $this->log->debug("Loaded component $component.");
     return true;
@@ -115,7 +138,7 @@ class Site {
 
   public function root($path = null)
   {
-    return $this->getConf('root_path').$path;
+    return $this->getConf('root_path').'/'.$path;
   }
 
   /* Utility Functions */
@@ -137,14 +160,13 @@ class Site {
 
   public function loadClasses($file)
   {
-    $basename = basename($file);
     static $classes = array();
-    if (!isset($classes[$basename])) {
+    if (!isset($classes[$file])) {
       $pre = get_declared_classes();
       require_once($file);
-      $classes[$basename] = array_values(array_diff(get_declared_classes(), $pre));
+      $classes[$file] = array_values(array_diff(get_declared_classes(), $pre));
     }
-    return $classes[$basename];
+    return $classes[$file];
   }
 
   public function arrayDefaults($conf, $var, $val = null)
@@ -157,7 +179,7 @@ class Site {
     }
 
     foreach ($defaults as $var => $val) {
-      $conf[$var] = @$conf[$var]?:$val;
+      $conf[$var] = isset($conf[$var])?$conf[$var]:$val;
     }
 
     return $conf;
@@ -170,11 +192,43 @@ class Site {
     return microtime(true) - $s;
   }
 
+  public function uploadFile($upload, $toPath = null, $filename = null)
+  {
+    if (is_null($toPath)) {
+      $toPath = realpath($this->getConf('tmp_path').'/upload');
+    }
+    if (is_null($filename)) {
+      $filename = uniqid('up');
+    }
+    $uploadInfo = pathinfo($upload['name']);
+    $uploadfile = "$toPath/$filename".(@$uploadInfo['extension']?'.'.$uploadInfo['extension']:'');
+    if (!move_uploaded_file($upload['tmp_name'], $uploadfile)) {
+      return false;
+    }
+    return $uploadfile;
+  }
+
+  public function tempFile($prefix = null)
+  {
+    if (!isset($this->conf['tmp_path'])) {
+      return false;
+    }
+    return tempnam($this->conf['tmp_path'], $prefix);
+  }
+
+
   public function __destruct()
   {
-    foreach ($this->components as $name => $c)
-    {
-      unset($this->components[$name]);
+    $last = array ('log');
+    foreach ($this->components as $name => $c) {
+      if (!in_array($name, $last)) {
+        unset($this->components[$name]);
+      }
+    }
+    foreach ($last as $name) {
+      if (isset($this->components[$name])) {
+        unset($this->components[$name]);
+      }
     }
   }
 }

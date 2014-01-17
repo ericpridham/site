@@ -1,9 +1,4 @@
 Requirements:
 
-spyc (for YAML support)
-
-template:
-  Smarty
-
-db, dbs:
-  MDB2
+template: Smarty
+db, dbs: MDB2
