@@ -17,6 +17,7 @@ class SiteDatabase extends SiteComponent {
   protected $model;
   protected $field_info;
   protected $log_queries;
+  protected $extended;
 
   //
   // once a rw query has been made, all subsequent queries
@@ -236,7 +237,44 @@ class SiteDatabase extends SiteComponent {
     return @$this->field_info[$table_name][$sub];
   }
 
-  public function tableInfo($table_name)
+  public function initExtended()
+  {
+    if (!isset($this->extended)) {
+      $this->extended = array();
+      $results = $this->query('
+        SELECT t.name AS TableName, ep.name AS Property, Value
+        FROM (sys.extended_properties AS ep JOIN sys.tables AS t ON ep.major_id = t.object_id)
+        WHERE minor_id = 0
+      ');
+      if (count($results)) {
+        foreach ($results as $r) {
+          $this->extended[$r->TableName][$r->Property] = $r->Value;
+        }
+      }
+    }
+  }
+
+  public function getExtendedProperties($table)
+  {
+    $this->initExtended();
+    return (@$this->extended[$table]?:array());
+  }
+
+  public function getTables($extended = false)
+  {
+    $tables = $this->dbh_rw->listTables();
+    if (!$extended) {
+      return $tables;
+    }
+
+    $return = array();
+    foreach ($tables as $table) {
+      $return[] = array_merge(array('tableName' => $table), $this->getExtendedProperties($table));
+    }
+    return $return;
+  }
+
+  public function tableInfo($table_name, $extended = false)
   {
     return $this->dbh_rw->tableInfo($table_name);
   }
@@ -279,6 +317,7 @@ class SiteDatabase extends SiteComponent {
   }
   public function queryRW($query, $values = null, $count = null, $start = null, $indexby = null)
   {
+    $this->site->log->debug("queryRW: count($count) start($start)");
     return $this->_query($this->getConnection('rw'), $query, $values, $count, $start, $indexby);
   }
 
@@ -312,6 +351,7 @@ class SiteDatabase extends SiteComponent {
       }
 
       $c = $this->conf['result_class'];
+      $this->site->log->debug("new \$c: count($count) start($start)");
       $results = new $c($res, $count, $start, @$this->conf['record_class']);
     }
     catch (Exception $e) {
@@ -355,6 +395,17 @@ class SiteDatabase extends SiteComponent {
   public function getFirst($table_name, $where = null, $values = null)
   {
     $res = $this->search($table_name, $where, $values);
+
+    if (!$res->count()) {
+      return null;
+    }
+
+    return $res[0];
+  }
+
+  public function execFirst($function, $args = null, $count = null, $start = null, $indexby = null)
+  {
+    $res = $this->exec($function, $args, $count, $start, $indexby);
 
     if (!$res->count()) {
       return null;
@@ -484,6 +535,7 @@ class SiteDatabaseResult implements Iterator, ArrayAccess, Countable {
   protected $fetched;
   protected $wrap_class;
   protected $wrap_func;
+  protected $num_rows;
 
   public function __construct($res, $count = null, $start = null, $wrap_class = null)
   {
@@ -494,12 +546,12 @@ class SiteDatabaseResult implements Iterator, ArrayAccess, Countable {
       $start = 1;
     }
 
-    $nr = $res->numRows();
-    if (MDB2::isError($nr)) {
-      $nr = 0;
+    $this->num_rows = $res->numRows();
+    if (MDB2::isError($this->num_rows)) {
+      $this->num_rows = 0;
     }
 
-    $remainder = max($nr - $start + 1, 0);
+    $remainder = max($this->num_rows - $start + 1, 0);
 
     if (is_null($count) || $count > $remainder) {
       $count = $remainder;
@@ -538,6 +590,11 @@ class SiteDatabaseResult implements Iterator, ArrayAccess, Countable {
   public function inspect($var)
   {
     return $this->$var;
+  }
+
+  public function numRows()
+  {
+    return $this->num_rows;
   }
 
   public function fetchRow()
@@ -590,6 +647,16 @@ class SiteDatabaseResult implements Iterator, ArrayAccess, Countable {
     // note order of conditionals is important
     while($this->fetch_pos <= $i && $this->fetchRow());
     return $this->wrapRows($this->rows);
+  }
+
+  public function fetchGrouped($field)
+  {
+    $this->fetchRows();
+    $groups = array();
+    foreach ($this->rows as $row) {
+      $groups[$row[$field]][] = $this->wrapRow($row);
+    }
+    return $groups;
   }
 
   /* Iterator interface */
@@ -754,6 +821,11 @@ class SiteDatabaseModel {
     return $this->db->exec($function, $args, $count, $start, $indexby);
   }
 
+  public function execFirst($function, $args = null, $count = null, $start = null, $indexby = null)
+  {
+    return $this->db->execFirst($function, $args, $count, $start, $indexby);
+  }
+
   public function insert($table_name, $row)
   {
     $this->initModel($table_name);
@@ -903,6 +975,11 @@ class SiteDatabaseModelTable {
   public function exec($function, $args = null, $count = null, $start = null, $indexby = null)
   {
     return $this->model->exec($function, $args, $count, $start, $indexby);
+  }
+
+  public function execFirst($function, $args = null, $count = null, $start = null, $indexby = null)
+  {
+    return $this->model->execFirst($function, $args, $count, $start, $indexby);
   }
 
   public function searchRelated($table_name, $where = null, $values = null, $orderby = null)

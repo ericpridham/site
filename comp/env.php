@@ -13,8 +13,18 @@ class EnvironmentComponent extends SiteComponent
         'shell'  => $_ENV,
       );
       if (isset($this->conf['session'])) {
-        session_start();
+        @session_start();
         $this->env['session'] = $_SESSION;
+      }
+      foreach ($this->env['cookie'] as $name => $value) {
+        if (strpos($value, ':') !== false) {
+          $parsed = array();
+          foreach (explode(';', $value) as $kv) {
+            list ($k, $v) = explode(':', $kv, 2);
+            $parsed[$k] = $v;
+          }
+          $this->env['cookie'][$name] = $parsed;
+        }
       }
     }
     else {
@@ -38,6 +48,30 @@ class EnvironmentComponent extends SiteComponent
       }
     }
     return null;
+  }
+
+  public function getAll($source = null, $except = null)
+  {
+    if (is_null($source)) {
+      $return = $this->env;
+    }
+    elseif (isset($this->env[$source])) {
+      $return = $this->env[$source];
+    }
+
+    if (!isset($return)) {
+      return null;
+    }
+
+    if (is_array($except)) {
+      foreach ($except as $e) {
+        if (isset($return[$e])) {
+          unset($return[$e]);
+        }
+      }
+    }
+
+    return $return;
   }
 
   public function scrub($var, $source, $type, $default = null)

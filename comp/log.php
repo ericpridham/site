@@ -2,27 +2,43 @@
 class SiteLog extends SiteComponent implements Iterator, ArrayAccess, Serializable {
   protected $log;
   protected $iter_pos; // Iterator
+  protected $disabled;
 
   protected function init()
   {
     $this->log = array();
     $this->iter_pos = 0; // Iterator
+    $this->disabled = false;
   }
 
   public function log($type, $msg, $extra = null)
   {
+    if ($this->disabled) {
+      return;
+    }
     $bt = array();
     foreach(debug_backtrace(false) as $line) {
       unset($line['args']);
       $bt[] = $line;
     }
     $this->log[] = array(
-      'type'  => $type,
-      'msg'   => $msg,
-      'ts'    => microtime(true),
-      'extra' => $extra,
-      'bt'    => $bt,
+      'type'      => $type,
+      'message'   => $msg,
+      'timestamp' => microtime(true),
+      'extra'     => $extra,
+      'backtrace' => $bt,
     );
+  }
+
+  public function disable()
+  {
+    $this->log('debug', 'Logging disabled.');
+    $this->disabled = true;
+  }
+  public function enable()
+  {
+    $this->disabled = false;
+    $this->log('debug', 'Logging enabled.');
   }
 
   public function get($type = null)

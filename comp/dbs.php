@@ -19,6 +19,30 @@ class SiteDatabases extends SiteComponent {
     $this->startup_queries = $queries;
   }
 
+  public function getConf($var)
+  {
+    if (!is_array(@$this->conf[$var])) {
+      return null;
+    }
+    $ret = $this->conf[$var];
+    if (isset($ret['password'])) {
+      unset($ret['password']);
+    }
+    $ret['key'] = $var;
+    return $ret;
+  }
+
+  public function getDBs()
+  {
+    $dbs = array();
+    foreach ($this->conf as $k => $v) {
+      if (is_array($v)) {
+        $dbs[] = array_merge(array('key' => $k), $v);
+      }
+    }
+    return $dbs;
+  }
+
   public function __get($var)
   {
     // include required components here.  otherwise site.php picks up

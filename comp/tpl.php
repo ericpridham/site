@@ -2,13 +2,24 @@
 require_once('smarty/Smarty.class.php');
 
 class SiteTemplate extends SiteComponent {
-  protected $smarty;
-
-  public function init()
+  public function create()
   {
     $this->assertConfSet(array(
       'template_dir', 'compile_dir', 'config_dir', 'cache_dir'
     ));
+    return new SmartyHandler($this->site, $this->conf);
+  }
+}
+
+class SmartyHandler {
+  protected $site;
+  protected $conf;
+  protected $smarty;
+
+  public function __construct($site, $conf)
+  {
+    $this->site = $site;
+    $this->conf = $conf;
 
     $this->smarty = new Smarty();
     $this->smarty->template_dir = $this->site->root($this->conf['template_dir']);
