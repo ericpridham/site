@@ -1,31 +1,84 @@
 <?php
-
 require_once('MDB2.php');
 
 /**
- * Site component for DB access.
+ * Site component for database access.
  *
- * @uses SiteComponent
+ * This is a general purpose database connection component backed by MDB2, so
+ * you'll need to install MDB2 and the associated addons for your database.
+ * It supports single DB, heterogeneous pools, and RW/RO split pool schemes.  It
+ * also has an optional modeling system that allows you to write your own
+ * classes for each table and record instance.
+ *
+ * Settings
+ * --------
+ *
+ * Connection setting options:
+ *
+ * #1 [Single DB]
+ *   phptype: mysql|mssql|...
+ *   username: user
+ *   password: pass
+ *   host: host
+ *   db: dbname
+ *   model: true|false
+ *   tables_path: path/to/model/classes/
+ *   classes_file: path/to/custom/model/classes/
+ *
+ * #2 [DB Pool]
+ *   pool:
+ *     - [Single DB]
+ *     - [Single DB]
+ *     ...
+ *
+ * #3 RO/RW Split DB
+ *   ro: [Single DB]|[DB Pool]
+ *   rw: [Single DB]|[DB Pool]
+ *
  * @package Site
- * @author Eric Pridham
  */
 class SiteDatabase extends SiteComponent {
-  protected $dns;
+  /**
+   * Current connection handler to read-only db.
+   * @var object
+   */
   protected $dbh_ro;
+  /**
+   * Current connection handler to read/write db.
+   * @var object
+   */
   protected $dbh_rw;
+  /**
+   * Configuration options parsed from settings file.
+   * @var array
+   */
   protected $conf;
+  /**
+   * Instance of modeling handler class.
+   * @var object
+   */
   protected $model;
+  /**
+   * Field info (primary key, autoinc) for table fields.
+   * @var array
+   */
   protected $field_info;
+  /**
+   * Query logs.
+   * @var array
+   */
   protected $log_queries;
-  protected $extended;
 
-  //
-  // once a rw query has been made, all subsequent queries
-  // are made to the rw server.  that way updates are immediately
-  // queriable.
-  //
+  /**
+   * once a rw query has been made, all subsequent queries are made to the rw
+   * server so  updates are immediately queriable.
+   * @var bool
+   */
   protected $force_rw = false;
 
+  /**
+   * Component initializer.
+   */
   public function init()
   {
     $this->defaultConf(array(
@@ -53,7 +106,14 @@ class SiteDatabase extends SiteComponent {
     $this->log_queries = $this->conf['log_queries'];
   }
 
-  public function loadClassesFile($classes_file)
+
+  /**
+   * Loads conf['classes_file'] looking for overrides for the built-in modeling
+   * classes.
+   *
+   * @param string $classes_file Path to file containing class definitions.
+   */
+  protected function loadClassesFile($classes_file)
   {
     $new_classes = Site::loadClasses($classes_file);
     foreach ($new_classes as $class) {
@@ -80,28 +140,6 @@ class SiteDatabase extends SiteComponent {
 
   /**
    * Initializes connections to the DB.
-   *
-   * Connection combinations:
-   *
-   * #1 Single DB
-   *    phptype =>
-   *    username =>
-   *    password =>
-   *    host =>
-   *    db =>
-   *
-   * #2 DB Pool
-   *    pool =>
-   *      0 => [Single DB]
-   *      1 => [Single DB]
-   *      ...
-   *
-   * #3 RO/RW Split DB
-   *    ro => [Single DB]|[DB Pool]
-   *    rw => [Single DB]|[DB Pool]
-   *
-   * @access protected
-   * @return void
    */
   protected function initConnections()
   {
@@ -134,6 +172,11 @@ class SiteDatabase extends SiteComponent {
     }
   }
 
+  /**
+   * Turn on/off query logging.
+   *
+   * @param bool $do_log
+   */
   public function logQueries($do_log)
   {
     $this->log_queries = $do_log;
@@ -142,9 +185,8 @@ class SiteDatabase extends SiteComponent {
   /**
    * Connects to DB.
    *
-   * @param array $dbconf - DB config
-   * @access protected
-   * @return mixed - DB connection handle
+   * @param array $dbconf DB config
+   * @return mixed DB connection handle
    */
   protected function dbConnect($dbconf)
   {
@@ -176,10 +218,18 @@ class SiteDatabase extends SiteComponent {
     return $dbh;
   }
 
+  /**
+   * Initializes a connection to one of the databases in a pool.
+   *
+   * @param array $pool Array of database connections.
+   * @return mixed Database handle.
+   */
   protected function dbConnectFromPool($pool)
   {
     $dbh = null;
 
+    // Here we just go through sequentially and find the first active db
+    // connection.  TODO: Implement hooks for optional decision schemes.
     for ($i = 0; $i < count($pool) && is_null($dbh); ++$i) {
       try {
         $dbh = $this->dbConnect($pool[$i]);
@@ -194,6 +244,12 @@ class SiteDatabase extends SiteComponent {
     return $dbh;
   }
 
+  /**
+   * Returns an established connection of type $type (or rw if force_rw = true).
+   *
+   * @param string $type 'rw' or 'ro'
+   * @return mixed Active DB connection handle or null if none found.
+   */
   public function getConnection($type)
   {
     if ($this->force_rw || $type == 'rw') {
@@ -208,6 +264,11 @@ class SiteDatabase extends SiteComponent {
     }
   }
 
+  /**
+   * Initialize field info from MDB2 reflection functions for a single table.
+   *
+   * @param string $table_name Table to get info for.
+   */
   protected function initFieldInfo($table_name)
   {
     if (!isset($this->field_info[$table_name])) {
@@ -228,6 +289,13 @@ class SiteDatabase extends SiteComponent {
     }
   }
 
+  /**
+   * Returns field info for single table.
+   *
+   * @param string $table_name Table to get info for.
+   * @param string $sub Subset of field info to return.
+   * @return array Requested field info.
+   */
   public function getFieldInfo($table_name, $sub = null)
   {
     $this->initFieldInfo($table_name);
@@ -237,48 +305,30 @@ class SiteDatabase extends SiteComponent {
     return @$this->field_info[$table_name][$sub];
   }
 
-  public function initExtended()
+  /**
+   * Returns a list of tables for the database.
+   *
+   * @return array List of table names.
+   */
+  public function getTables()
   {
-    if (!isset($this->extended)) {
-      $this->extended = array();
-      $results = $this->query('
-        SELECT t.name AS TableName, ep.name AS Property, Value
-        FROM (sys.extended_properties AS ep JOIN sys.tables AS t ON ep.major_id = t.object_id)
-        WHERE minor_id = 0
-      ');
-      if (count($results)) {
-        foreach ($results as $r) {
-          $this->extended[$r->TableName][$r->Property] = $r->Value;
-        }
-      }
-    }
+    return $this->dbh_rw->listTables();
   }
 
-  public function getExtendedProperties($table)
-  {
-    $this->initExtended();
-    return (@$this->extended[$table]?:array());
-  }
-
-  public function getTables($extended = false)
-  {
-    $tables = $this->dbh_rw->listTables();
-    if (!$extended) {
-      return $tables;
-    }
-
-    $return = array();
-    foreach ($tables as $table) {
-      $return[] = array_merge(array('tableName' => $table), $this->getExtendedProperties($table));
-    }
-    return $return;
-  }
-
-  public function tableInfo($table_name, $extended = false)
+  /**
+   * Returns results from an MDB2 tableInfo call.
+   *
+   * @param string $table_name Table to get info for.
+   * @return mixed Table information.
+   */
+  public function tableInfo($table_name)
   {
     return $this->dbh_rw->tableInfo($table_name);
   }
 
+  /**
+   * Destructor.
+   */
   public function __destruct()
   {
     if ($this->dbh_ro) {
@@ -290,6 +340,15 @@ class SiteDatabase extends SiteComponent {
     parent::__destruct();
   }
 
+  /**
+   * Table picker.
+   *
+   * Magical get function that, when modeling is turned on, returns an instance
+   * of a modeled table class.
+   *
+   * @param string $var Table to model.
+   * @return mixed Instance of table's model class.
+   */
   public function __get($var)
   {
     if (@$this->conf['model']) {
@@ -305,22 +364,42 @@ class SiteDatabase extends SiteComponent {
     }
   }
 
+  /**
+   * Wrapper for queryRW.
+   */
   public function query($query, $values = null, $count = null, $start = null, $indexby = null)
   {
     // when in doubt, query RW
     return $this->queryRW($query, $values, $count, $start, $indexby);
   }
 
+  /**
+   * Wrapper for _query that defaults to connection type 'ro'.
+   */
   public function queryRO($query, $values = null, $count = null, $start = null, $indexby = null)
   {
     return $this->_query($this->getConnection('ro'), $query, $values, $count, $start, $indexby);
   }
+
+  /**
+   * Wrapper for _query that defaults to connection type 'rw'.
+   */
   public function queryRW($query, $values = null, $count = null, $start = null, $indexby = null)
   {
-    $this->site->log->debug("queryRW: count($count) start($start)");
     return $this->_query($this->getConnection('rw'), $query, $values, $count, $start, $indexby);
   }
 
+  /**
+   * Executes a query.
+   *
+   * @param object $dbh DB connection handle
+   * @param string $query Query string.
+   * @param array $values Bind values.
+   * @param int $count Number of records to return.  null = all
+   * @param int $start Index of first record to return.  null = 0
+   * @param string $indexby (NOT YET IMPLEMENTED)
+   * @return object An instance of result_class.
+   */
   protected function _query($dbh, $query, $values = null, $count = null, $start = null, $indexby = null)
   {
     $log = array();
@@ -367,6 +446,18 @@ class SiteDatabase extends SiteComponent {
     return $results;
   }
 
+  /**
+   * Executes a read-only select * query.
+   *
+   * @param string $table_name Table to query.
+   * @param string $where WHERE clause of the select.
+   * @param array $values Bind values.
+   * @param string $orderby ORDER BY clause.
+   * @param int $count Number of records to return.  null = all
+   * @param int $start Index of first record to return.  null = 0
+   * @param string $indexby (NOT YET IMPLEMENTED)
+   * @return object An instance of result_class.
+   */
   public function search($table_name, $where = null, $values = null, $orderby = null, $count = null, $start = null, $indexby = null)
   {
     return $this->queryRO(
@@ -377,21 +468,14 @@ class SiteDatabase extends SiteComponent {
     );
   }
 
-  public function exec($function, $args = null, $count = null, $start = null, $indexby = null)
-  {
-    $argstr  = '';
-    if (is_array($args)) {
-      foreach ($args as $var => $val) {
-        if (!is_null($val) && $val !== '') {
-          $argstr .= ($argstr?', ':'') . "@$var = :$var";
-        }
-      }
-    }
-    return $this->queryRW(
-      "EXEC $function $argstr", $args, $count, $start, $indexby
-    );
-  }
-
+  /**
+   * Executes a search() then returns the first result
+   *
+   * @param string $table_name Table to query.
+   * @param string $where WHERE clause of the search.
+   * @param string $values Bind values.
+   * @return object Returns a record instance or null if no results.
+   */
   public function getFirst($table_name, $where = null, $values = null)
   {
     $res = $this->search($table_name, $where, $values);
@@ -403,17 +487,13 @@ class SiteDatabase extends SiteComponent {
     return $res[0];
   }
 
-  public function execFirst($function, $args = null, $count = null, $start = null, $indexby = null)
-  {
-    $res = $this->exec($function, $args, $count, $start, $indexby);
-
-    if (!$res->count()) {
-      return null;
-    }
-
-    return $res[0];
-  }
-
+  /**
+   * Executes a r/w insert into query.
+   *
+   * @param string $table_name Table to insert into.
+   * @param array $row Associative array of (fieldname => value) pairs containing the data to insert.
+   * @return mixed The auto-int key of the inserted record or true if no auto-int exists.
+   */
   public function insert($table_name, $row)
   {
     if (!is_array($row) || empty($row)) {
@@ -466,6 +546,14 @@ class SiteDatabase extends SiteComponent {
     return true;
   }
 
+  /**
+   * Executes a r/w update query.
+   *
+   * @param string $table_name Table to update.
+   * @param string $where WHERE clause of the update.
+   * @param array $values Bind values for the WHERE.
+   * @param array $update_values Associative array of (fieldname => value) pairs containing the data to update.
+   */
   public function update($table_name, $where, $values, $update_values)
   {
     $assigns = '';
@@ -478,12 +566,21 @@ class SiteDatabase extends SiteComponent {
     );
   }
 
+  /**
+   * Executes a r/w delete query.
+   *
+   * @param string $table_name Table to delete from.
+   * @param string $where WHERE clause of the delete.
+   * @param array $values Bind values.
+   */
   public function delete($table_name, $where, $values)
   {
     $this->queryRW("delete from $table_name where $where", $values);
   }
 
-  /*
+  /**
+   * Begins a transaction.
+   *
    * NOTE! MDB2's mysqli driver gets it's SET AUTOCOMMIT statements reversed.
    * Fix it by changing '= 1' to '= 0' and vice versa in transaction function
    * calls in Driver/mysqli.php
@@ -494,11 +591,17 @@ class SiteDatabase extends SiteComponent {
     $this->dbh_rw->beginTransaction();
   }
 
+  /**
+   * Commits the current transaction.
+   */
   public function commit()
   {
     $this->dbh_rw->commit();
   }
 
+  /**
+   * Rolls back the current transction.
+   */
   public function rollback()
   {
     $this->dbh_rw->rollback();
@@ -511,6 +614,11 @@ class SiteDatabase extends SiteComponent {
   }
 }
 
+/**
+ * Interface for a class set up to be a record wrapper.
+ *
+ * @package Site
+ */
 interface SiteDatabaseRecordWrapper {
   public function getRow();
 }
@@ -518,25 +626,85 @@ interface SiteDatabaseRecordWrapper {
 /**
  * Result set wrapper class for SiteDatabase
  *
- * @uses Iterator
- * @uses ArrayAccess
- * @uses Countable
+ * This class (or a define subclass) is what is returned from any select query.
+ * It handles providing details about the result set, and then iterating over
+ * the result resource to obtain the required records, if necessary.
+ *
+ * It implements Iterator, ArrayAccess, and Countable so that it can be treated,
+ * in most cases, like an array of result records.
+ *
  * @package Site
  */
 class SiteDatabaseResult implements Iterator, ArrayAccess, Countable {
+  /**
+   * Resource pointing back to the query results returned by an MDB2 query.
+   * @var object
+   */
   protected $res;
+  /**
+   * Where to start pulling records in the result resource.
+   * @var int
+   */
   protected $start;
+  /**
+   * How many records to pull from the result resource.
+   * @var int
+   */
   protected $count;
+  /**
+   * The raw data pulled from the result resource so far.
+   * @var array
+   */
   protected $rows;
+  /**
+   * The raw data for the last record pulled from the result resource.
+   * @var array
+   */
   protected $cur_row;
+  /**
+   * The next position to pull from when iterating through the result resource.
+   * @var int
+   */
   protected $fetch_pos;
+  /**
+   * The next position to pull from when iterating the resources already pulled.
+   * @var int
+   */
   protected $iter_pos;
+  /**
+   * Whether rewind has been called at least once.
+   * @var bool
+   */
   protected $first_rewind;
+  /**
+   * Whether all the records in the result resource have been fetched.
+   * @var bool
+   */
   protected $fetched;
+  /**
+   * The name of the class to use as a wrapper for each record.
+   * @var string
+   */
   protected $wrap_class;
+  /**
+   * The name of the function to call that will returned a wrapped record.
+   * @var string
+   */
   protected $wrap_func;
+  /**
+   * Total number of records in the result resource.
+   * @var int
+   */
   protected $num_rows;
 
+  /**
+   * Constructor.
+   *
+   * @param object $res Query result resource
+   * @param int $count Total number of records to account for in the result.
+   * @param int $start Index of the first record in the result set to pull.
+   * @param string $wrap_class Name of the class to use as the record wrapper.
+   */
   public function __construct($res, $count = null, $start = null, $wrap_class = null)
   {
     if ($start > 1) {
@@ -571,6 +739,11 @@ class SiteDatabaseResult implements Iterator, ArrayAccess, Countable {
     $this->wrap_func = null;
   }
 
+  /**
+   * Sets the class to use as the record wrapper.
+   *
+   * @param string $wrap_class Class name.
+   */
   public function setWrapClass($wrap_class)
   {
     if (!is_null($wrap_class)) {
@@ -581,6 +754,11 @@ class SiteDatabaseResult implements Iterator, ArrayAccess, Countable {
     $this->wrap_class = $wrap_class;
   }
 
+  /**
+   * Sets the function to use as the record wrapper.
+   *
+   * @param string $f Function name.
+   */
   public function setWrapFunc($f)
   {
     $this->wrap_func = $f;
@@ -592,11 +770,21 @@ class SiteDatabaseResult implements Iterator, ArrayAccess, Countable {
     return $this->$var;
   }
 
+  /**
+   * Gets the number of rows in the records in the result resource.
+   *
+   * @return int Number of records.
+   */
   public function numRows()
   {
     return $this->num_rows;
   }
 
+  /**
+   * Fetches the next row from the result resource.
+   *
+   * @return object Wrapper class around the next result.
+   */
   public function fetchRow()
   {
     if ($this->fetched) {
@@ -613,6 +801,12 @@ class SiteDatabaseResult implements Iterator, ArrayAccess, Countable {
     return $this->wrapRow($this->cur_row);
   }
 
+  /**
+   * Initializes the wrapper class with the raw data.
+   *
+   * @param array $row Raw data from a query result.
+   * @return object Instance of wrapper class containing the input row.
+   */
   protected function wrapRow($row)
   {
     if ($this->wrap_func) {
@@ -629,6 +823,12 @@ class SiteDatabaseResult implements Iterator, ArrayAccess, Countable {
     return $ret;
   }
 
+  /**
+   * Wraps multiple rows at once.
+   *
+   * @param array $rows Array of raw data from a query result.
+   * @return object Array of instances of wrapper class containing the input rows.
+   */
   protected function wrapRows($rows)
   {
     $w = array();
@@ -638,7 +838,12 @@ class SiteDatabaseResult implements Iterator, ArrayAccess, Countable {
     return $w;
   }
 
-  // fetch to $i index, or all
+  /**
+   * Fetches rows from the results resource.
+   *
+   * @param int $i Index to start pulling records from.
+   * @return array Array of wrapped rows.
+   */
   public function fetchRows($i = null)
   {
     if (is_null($i)) {
@@ -649,6 +854,12 @@ class SiteDatabaseResult implements Iterator, ArrayAccess, Countable {
     return $this->wrapRows($this->rows);
   }
 
+  /**
+   * Fetches rows and groups them by a particular field.
+   *
+   * @param string $field Field to group records by
+   * @return array Associative array of wrapped records, grouped by $field.
+   */
   public function fetchGrouped($field)
   {
     $this->fetchRows();
@@ -687,7 +898,7 @@ class SiteDatabaseResult implements Iterator, ArrayAccess, Countable {
       while ($this->fetchRow());
     }
     $this->iter_pos = 0;
-    $this->first_rewind = false;
+    $this->first_rewind = true;
   }
   public function valid()
   {
@@ -731,7 +942,7 @@ class SiteDatabaseResult implements Iterator, ArrayAccess, Countable {
 
 
 /**
- * Model class manages interface betwen modeled tables and database.
+ * Model class manages interface between modeled tables and database.
  *
  * @package Site
  */
@@ -742,6 +953,13 @@ class SiteDatabaseModel {
   protected $tables_path;
   protected $model_record_class;
 
+  /**
+   * SiteDatabaseModel contructor.
+   *
+   * @param object $database Instance of SiteDatabase
+   * @param string $tables_path Path to the table (model) classes.
+   * @param string $model_record_class Name of record wrapper class.
+   */
   public function __construct($database, $tables_path, $model_record_class = null)
   {
     if (!$database) {
@@ -762,29 +980,64 @@ class SiteDatabaseModel {
     unset($this->db);
   }
 
+  /**
+   * Magical getter for accessing table class instance ($site->db->tableName-> ...)
+   * @param string $table_name Name of table.
+   */
   public function __get($table_name)
   {
     $this->initModel($table_name);
     return @$this->tables[$table_name];
   }
 
+  /**
+   * Returns database field info.
+   *
+   * @param string $table_name
+   * @param string $sub Subset of field records to return.
+   * @return array All field info, or $sub subset.
+   */
   public function getFieldInfo($table_name, $sub = null)
   {
     return $this->db->getFieldInfo($table_name, $sub);
   }
 
+  /**
+   * Creates a new instance of $table_name record model class.
+   *
+   * @param string $table_name
+   * @param array $row Initial values to load into record instance.
+   * @param bool $exists Does this record instance reflect an actual DB record?
+   * @param bool $dirty Has any value in this instance changed?
+   * @return object Instance of $table_name row.
+   */
   public function create($table_name, $row = null, $exists = false, $dirty = false)
   {
     $this->initModel($table_name);
     return $this->tables[$table_name]->create($row, $exists, $dirty);
   }
 
+  /**
+   * Get the name of the class we're using to wrap $table_name records.
+   *
+   * @param string $table_name
+   * @return string Name of record wrapper class.
+   */
   public function getRecordClass($table_name)
   {
     $this->initModel($table_name);
     return $this->tables[$table_name]->getRecordClass();
   }
 
+  /**
+   * Returns a single record (the first one returned by the db) matching the
+   * criteria provided.  Simplifies querying for a single record.
+   *
+   * @param string $table_name
+   * @param string $where Conditions of the WHERE clause for the query
+   * @param array $values Bind values for the $where
+   * @return object Instance of first record matching criteria, or null if not found.
+   */
   public function get($table_name, $where, $values = null)
   {
     $this->initModel($table_name);
@@ -798,16 +1051,26 @@ class SiteDatabaseModel {
     return $this->create($table_name, $row, /*exists=*/true);
   }
 
+  /**
+   * Returns all records in a table.  See search function for parameters.
+   */
   public function all($table_name, $orderby = null, $count = null, $start = null, $indexby = null)
   {
     return $this->search($table_name, null, null, $orderby, $count, $start, $indexby);
   }
 
+  /**
+   * Calls db search, then ensures that the records returned from the result set
+   * are wrapped in the model class.
+   */
   public function search($table_name, $where = null, $values = null, $orderby = null, $count = null, $start = null, $indexby = null)
   {
     $this->initModel($table_name);
 
     $res = $this->db->search($table_name, $where, $values, $orderby, $count, $start, $indexby);
+
+    // set the result set wrapper function to a closure so that it calls create
+    // on the proper instance.
     $o = $this;
     $res->setWrapFunc(function ($row) use ($o, $table_name) {
       return $o->create($table_name, $row, /*exists=*/true);
@@ -816,20 +1079,18 @@ class SiteDatabaseModel {
     return $res;
   }
 
-  public function exec($function, $args = null, $count = null, $start = null, $indexby = null)
-  {
-    return $this->db->exec($function, $args, $count, $start, $indexby);
-  }
-
-  public function execFirst($function, $args = null, $count = null, $start = null, $indexby = null)
-  {
-    return $this->db->execFirst($function, $args, $count, $start, $indexby);
-  }
-
+  /**
+   * Does an insert into $table_name with the values in $row and returns a
+   * modeled instance of the record.
+   *
+   * @param string $table_name
+   * @param array $row Values to insert.
+   */
   public function insert($table_name, $row)
   {
     $this->initModel($table_name);
 
+    // update the auto-int if one exists.
     $id = $this->db->insert($table_name, $row);
     if ($auto = $this->getFieldInfo($table_name, 'auto')) {
       $row[$auto] = $id;
@@ -838,21 +1099,39 @@ class SiteDatabaseModel {
     return $this->create($table_name, $row, /*exists=*/true, /*dirty=*/true);
   }
 
+  /**
+   * Updates the table records matching the provided criteria.
+   *
+   * @param string $table_name Table to update.
+   * @param string $where WHERE clause of the update.
+   * @param array $values Bind values for the WHERE.
+   * @param array $update_values Associative array of (fieldname => value) pairs
+   * containing the data to update.
+   */
   public function update($table_name, $where, $values, $row)
   {
     $this->initModel($table_name);
-
     $this->db->update($table_name, $where, $values, $row);
-
-    return $this->create($table_name, array_merge($values, $row), /*exists=*/true, /*dirty=*/true);
   }
 
+  /**
+   * Delete the table records matching the provided criteria.
+   *
+   * @param string $table_name Table to delete from.
+   * @param string $where WHERE clause of the delete.
+   * @param array $values Bind values for the WHERE.
+   */
   public function delete($table_name, $where, $values)
   {
     $this->initModel($table_name);
     $this->db->delete($table_name, $where, $values);
   }
 
+  /**
+   * Initializes the model handler for a particular table.
+   *
+   * @param string $table_name
+   */
   protected function initModel($table_name)
   {
     if (isset($this->tables[$table_name])) {
@@ -883,12 +1162,34 @@ class SiteDatabaseModel {
   }
 }
 
+/**
+ * Base handler class for a modeled table.
+ */
 class SiteDatabaseModelTable {
+  /**
+   * Reference back to the model class.
+   * @var object
+   */
   protected $model;
+  /**
+   * Name of the table modeled by this class.
+   * @var string
+   */
   protected $table_name;
+  /**
+   * Name of the class used to wrap each record.
+   * @var string
+   */
   protected $record_class;
+  /**
+   * Cache for related record queries.
+   * @var array
+   */
   protected $rel_cache;
 
+  /**
+   * 
+   */
   public function __construct($model, $table_name, $record_class = null)
   {
     $this->model = $model;
@@ -954,7 +1255,7 @@ class SiteDatabaseModelTable {
 
   public function update($where, $values, $row)
   {
-    return $this->model->update($this->table_name, $where, $values, $row);
+    $this->model->update($this->table_name, $where, $values, $row);
   }
 
   public function delete($where, $values)
@@ -970,16 +1271,6 @@ class SiteDatabaseModelTable {
   public function search($where = null, $values = null, $orderby = null, $count = null, $start = null, $indexby = null)
   {
     return $this->model->search($this->table_name, $where, $values, $orderby, $count, $start, $indexby);
-  }
-
-  public function exec($function, $args = null, $count = null, $start = null, $indexby = null)
-  {
-    return $this->model->exec($function, $args, $count, $start, $indexby);
-  }
-
-  public function execFirst($function, $args = null, $count = null, $start = null, $indexby = null)
-  {
-    return $this->model->execFirst($function, $args, $count, $start, $indexby);
   }
 
   public function searchRelated($table_name, $where = null, $values = null, $orderby = null)
@@ -1003,12 +1294,10 @@ class SiteDatabaseModelRecord implements SiteDatabaseRecordWrapper {
   /**
    * SiteDatabaseModelRecord constructor.
    *
-   * @param mixed $table - SiteDatabaseModelTable (or derived) object
-   * @param mixed $row - field/value assoc
-   * @param mixed $exists - if the record exists in the DB already
-   * @param mixed $dirty - $row is fresh from the db (false) or not (true)
-   * @access public
-   * @return void
+   * @param mixed $table SiteDatabaseModelTable (or derived) object
+   * @param mixed $row Assoc array of record values
+   * @param mixed $exists If the record exists in the DB already
+   * @param mixed $dirty $row Is fresh from the db (false) or not (true)
    */
   public function __construct($table, $row = null, $exists = false, $dirty = false)
   {
