@@ -35,6 +35,35 @@ require_once('MDB2.php');
  *   ro: [Single DB]|[DB Pool]
  *   rw: [Single DB]|[DB Pool]
  *
+ * Usage
+ * -----
+ *
+ * Non-modeled:
+ *
+ *   $users = $site->db->query('SELECT username, firstname, lastname FROM users');
+ *   echo $users->numRows() . " User(s):\n\n";
+ *   foreach ($users as $user) {
+ *     echo $user->lastname . ", " . $user->lastname . "\n";
+ *   }
+ *
+ *   $login = $site->db->get('users', 'username = ? and password = ?', array('hrunner', 'marzipan'));
+ *   if (is_null($login)) {
+ *      throw Exception("Login failed!");
+ *   }
+ *
+ * Modeled:
+ *
+ *   $users = $site->db->users->all();
+ *   ...
+ *
+ *   $login = $site->db->users->get('username = ? and password = ?', array('sbad', 'trogdor'));
+ *   if (is_null($login)) {
+ *      throw Exception("Login failed!");
+ *   }
+ *   $login->last_login = date('Y-m-d H:i:s');
+ *   $login->save();
+ * 
+ *
  * @package Site
  */
 class SiteDatabase extends SiteComponent {
@@ -398,7 +427,7 @@ class SiteDatabase extends SiteComponent {
    * @param int $count Number of records to return.  null = all
    * @param int $start Index of first record to return.  null = 0
    * @param string $indexby (NOT YET IMPLEMENTED)
-   * @return object An instance of result_class.
+   * @return object An handler instance of result_class for query results.
    */
   protected function _query($dbh, $query, $values = null, $count = null, $start = null, $indexby = null)
   {
@@ -450,13 +479,13 @@ class SiteDatabase extends SiteComponent {
    * Executes a read-only select * query.
    *
    * @param string $table_name Table to query.
-   * @param string $where WHERE clause of the select.
-   * @param array $values Bind values.
-   * @param string $orderby ORDER BY clause.
+   * @param string $where Conditions for the WHERE clause of the select.
+   * @param array $values Bind values for WHERE clause.
+   * @param string $orderby Fields for the ORDER BY clause.
    * @param int $count Number of records to return.  null = all
    * @param int $start Index of first record to return.  null = 0
    * @param string $indexby (NOT YET IMPLEMENTED)
-   * @return object An instance of result_class.
+   * @return object An handler instance of result_class for query results.
    */
   public function search($table_name, $where = null, $values = null, $orderby = null, $count = null, $start = null, $indexby = null)
   {
@@ -472,7 +501,7 @@ class SiteDatabase extends SiteComponent {
    * Executes a search() then returns the first result
    *
    * @param string $table_name Table to query.
-   * @param string $where WHERE clause of the search.
+   * @param string $where Conditions for the WHERE clause of the search.
    * @param string $values Bind values.
    * @return object Returns a record instance or null if no results.
    */
@@ -491,7 +520,7 @@ class SiteDatabase extends SiteComponent {
    * Executes a r/w insert into query.
    *
    * @param string $table_name Table to insert into.
-   * @param array $row Associative array of (fieldname => value) pairs containing the data to insert.
+   * @param array $row Assoc array of (column => value) pairs containing the data to insert.
    * @return mixed The auto-int key of the inserted record or true if no auto-int exists.
    */
   public function insert($table_name, $row)
@@ -550,9 +579,9 @@ class SiteDatabase extends SiteComponent {
    * Executes a r/w update query.
    *
    * @param string $table_name Table to update.
-   * @param string $where WHERE clause of the update.
+   * @param string $where Conditions for the WHERE clause of the update.
    * @param array $values Bind values for the WHERE.
-   * @param array $update_values Associative array of (fieldname => value) pairs containing the data to update.
+   * @param array $update_values Assoc array of (column => value) pairs containing the data to update.
    */
   public function update($table_name, $where, $values, $update_values)
   {
@@ -570,8 +599,8 @@ class SiteDatabase extends SiteComponent {
    * Executes a r/w delete query.
    *
    * @param string $table_name Table to delete from.
-   * @param string $where WHERE clause of the delete.
-   * @param array $values Bind values.
+   * @param string $where Conditions for the WHERE clause of the delete.
+   * @param array $values Bind values for WHERE clause.
    */
   public function delete($table_name, $where, $values)
   {
@@ -607,6 +636,9 @@ class SiteDatabase extends SiteComponent {
     $this->dbh_rw->rollback();
   }
 
+  /**
+   * Echoes the debug output from the active MDB2 connection handlers.
+   */
   public function getDebugOutput()
   {
     return "RO:\n" . $this->dbh_ro->getDebugOutput()
@@ -698,7 +730,8 @@ class SiteDatabaseResult implements Iterator, ArrayAccess, Countable {
   protected $num_rows;
 
   /**
-   * Constructor.
+   * Initializes state, including iterator state, based on the parameters
+   * (iterator will start at $start if provided, etc).
    *
    * @param object $res Query result resource
    * @param int $count Total number of records to account for in the result.
@@ -858,7 +891,7 @@ class SiteDatabaseResult implements Iterator, ArrayAccess, Countable {
    * Fetches rows and groups them by a particular field.
    *
    * @param string $field Field to group records by
-   * @return array Associative array of wrapped records, grouped by $field.
+   * @return array Assoc array of wrapped records, grouped by $field.
    */
   public function fetchGrouped($field)
   {
@@ -982,6 +1015,7 @@ class SiteDatabaseModel {
 
   /**
    * Magical getter for accessing table class instance ($site->db->tableName-> ...)
+   * 
    * @param string $table_name Name of table.
    */
   public function __get($table_name)
@@ -1009,7 +1043,7 @@ class SiteDatabaseModel {
    * @param array $row Initial values to load into record instance.
    * @param bool $exists Does this record instance reflect an actual DB record?
    * @param bool $dirty Has any value in this instance changed?
-   * @return object Instance of $table_name row.
+   * @return object Instance of model_record_class containing $row.
    */
   public function create($table_name, $row = null, $exists = false, $dirty = false)
   {
@@ -1021,7 +1055,7 @@ class SiteDatabaseModel {
    * Get the name of the class we're using to wrap $table_name records.
    *
    * @param string $table_name
-   * @return string Name of record wrapper class.
+   * @return string Name of model wrapper class.
    */
   public function getRecordClass($table_name)
   {
@@ -1034,9 +1068,10 @@ class SiteDatabaseModel {
    * criteria provided.  Simplifies querying for a single record.
    *
    * @param string $table_name
-   * @param string $where Conditions of the WHERE clause for the query
+   * @param string $where Conditions for the WHERE clause for the query.
    * @param array $values Bind values for the $where
-   * @return object Instance of first record matching criteria, or null if not found.
+   * @return object Instance of model wrapper class for first record matching
+   * criteria, or null if not found.
    */
   public function get($table_name, $where, $values = null)
   {
@@ -1052,7 +1087,14 @@ class SiteDatabaseModel {
   }
 
   /**
-   * Returns all records in a table.  See search function for parameters.
+   * Returns all records in a table.
+   *
+   * @param string $table_name Table to query.
+   * @param string $orderby Fields for the ORDER BY clause.
+   * @param int $count Number of records to return.  null = all
+   * @param int $start Index of first record to return.  null = 0
+   * @param string $indexby (NOT YET IMPLEMENTED)
+   * @return object An instance of result_class, using model_record_class as a wrapper.
    */
   public function all($table_name, $orderby = null, $count = null, $start = null, $indexby = null)
   {
@@ -1062,6 +1104,15 @@ class SiteDatabaseModel {
   /**
    * Calls db search, then ensures that the records returned from the result set
    * are wrapped in the model class.
+   * 
+   * @param string $table_name Table to query.
+   * @param string $where Conditions for the WHERE clause of the select.
+   * @param array $values Bind values for WHERE clause.
+   * @param string $orderby Fields for the ORDER BY clause.
+   * @param int $count Number of records to return.  null = all
+   * @param int $start Index of first record to return.  null = 0
+   * @param string $indexby (NOT YET IMPLEMENTED)
+   * @return object An instance of result_class, using model_record_class as a wrapper.
    */
   public function search($table_name, $where = null, $values = null, $orderby = null, $count = null, $start = null, $indexby = null)
   {
@@ -1069,8 +1120,10 @@ class SiteDatabaseModel {
 
     $res = $this->db->search($table_name, $where, $values, $orderby, $count, $start, $indexby);
 
-    // set the result set wrapper function to a closure so that it calls create
-    // on the proper instance.
+    // The results wrapper class returned by the modeled table needs to, of course,
+    // returned model class wrappers, not the standard record wrappers.  An easy
+    // way to do this is to ensure that the model controller's create function
+    // is used.  This does that.
     $o = $this;
     $res->setWrapFunc(function ($row) use ($o, $table_name) {
       return $o->create($table_name, $row, /*exists=*/true);
@@ -1085,6 +1138,7 @@ class SiteDatabaseModel {
    *
    * @param string $table_name
    * @param array $row Values to insert.
+   * @return object Instance of modeled record class containing the inserted record.
    */
   public function insert($table_name, $row)
   {
@@ -1103,9 +1157,9 @@ class SiteDatabaseModel {
    * Updates the table records matching the provided criteria.
    *
    * @param string $table_name Table to update.
-   * @param string $where WHERE clause of the update.
+   * @param string $where Conditions for the WHERE clause of the update.
    * @param array $values Bind values for the WHERE.
-   * @param array $update_values Associative array of (fieldname => value) pairs
+   * @param array $update_values Assoc array of (column => value) pairs
    * containing the data to update.
    */
   public function update($table_name, $where, $values, $row)
@@ -1118,7 +1172,7 @@ class SiteDatabaseModel {
    * Delete the table records matching the provided criteria.
    *
    * @param string $table_name Table to delete from.
-   * @param string $where WHERE clause of the delete.
+   * @param string $where Conditions for the WHERE clause of the delete.
    * @param array $values Bind values for the WHERE.
    */
   public function delete($table_name, $where, $values)
@@ -1188,7 +1242,9 @@ class SiteDatabaseModelTable {
   protected $rel_cache;
 
   /**
-   * 
+   * @param object $model Link back to the model controller class.
+   * @param string $table_name Table to model.
+   * @param string $record_class Name of class, if any, to use as record wrapper.
    */
   public function __construct($model, $table_name, $record_class = null)
   {
@@ -1210,16 +1266,35 @@ class SiteDatabaseModelTable {
     unset($this->model);
   }
 
+  /**
+   * Simple table name getter.
+   *
+   * @return string Name of table modeled.
+   */
   public function getTableName()
   {
     return $this->table_name;
   }
 
+  /**
+   * Queries the model controller to get the field info for the current table.
+   *
+   * @param string $sub Subset of fields to return, if any.
+   * @return array Assoc array of requested info.
+   */
   public function getFieldInfo($sub = null)
   {
     return $this->model->getFieldInfo($this->table_name, $sub);
   }
 
+  /**
+   * Instantiates and returns a record wrapper.
+   *
+   * @param mixed $row Assoc array of (column => value), or instance of wrapper object.
+   * @param bool $exists Record exists in the database.
+   * @param bool $dirty Record has local updates.
+   * @return object Record wrapped in a model_record_class instance.
+   */
   public function create($row = null, $exists = false, $dirty = false)
   {
     $c = $this->record_class;
@@ -1229,16 +1304,37 @@ class SiteDatabaseModelTable {
     return new $c($this, $row, $exists, $dirty);
   }
 
+  /**
+   * Simple getter for the name of the record wrapper class.
+   *
+   * @return string Name of record class.
+   */
   public function getRecordClass()
   {
     return $this->record_class;
   }
 
+  /**
+   * Calls model controller's get method to return a single record matching the
+   * criteria provided, defaulting the modeled table name.
+   *
+   * @param string $where Conditions for the WHERE clause for the query
+   * @param array $values Bind values for the $where
+   * @return object Instance of first record matching criteria, or null if not found.
+   */
   public function get($where, $values = null)
   {
     return $this->model->get($this->table_name, $where, $values);
   }
 
+  /**
+   * Calls model controller's get method to return a single record matching the
+   * criteria provided, defaulting the modeled table name.
+   *
+   * @param string $where Conditions for the WHERE clause for the query
+   * @param array $values Bind values for the $where
+   * @return object Instance of first record matching criteria, or null if not found.
+   */
   public function getRelated($table_name, $where, $values)
   {
     $cache_key = $table_name.'-'.$where.serialize($values);
@@ -1248,56 +1344,131 @@ class SiteDatabaseModelTable {
     return $this->rel_cache[$cache_key];
   }
 
+  /**
+   * Calls the model controller's insert method to insert the values in $row and
+   * returns a wrapped instance of the record, defaulting the modeled table name.
+   *
+   * @param array $row Values to insert.
+   * @return object Instance of wrapped class containing the inserted record.
+   */
   public function insert($row)
   {
     return $this->model->insert($this->table_name, $row);
   }
 
+  /**
+   * Calls the model controller's update method to update the records matching
+   * the provided criteria, defaulting the modeled table name.
+   *
+   * @param string $where Conditions for the WHERE clause of the update.
+   * @param array $values Bind values for the WHERE.
+   * @param array $update_values Assoc array of (column => value) pairs
+   * containing the data to update.
+   */
   public function update($where, $values, $row)
   {
     $this->model->update($this->table_name, $where, $values, $row);
   }
 
+  /**
+   * Calls the model controller's delete method to delete the table records
+   * matching the provided criteria, defaulting the modeled table name.
+   *
+   * @param string $where Conditions for the WHERE clause of the delete.
+   * @param array $values Bind values for the WHERE.
+   */
   public function delete($where, $values)
   {
     return $this->model->delete($this->table_name, $where, $values);
   }
 
+  /**
+   * Calls the model controller's all method to returns all records in a table,
+   * defaulting the modeled table name.
+   *
+   * @param string $orderby Fields for the ORDER BY clause.
+   * @param int $count Number of records to return.  null = all
+   * @param int $start Index of first record to return.  null = 0
+   * @param string $indexby (NOT YET IMPLEMENTED)
+   * @return object An handler instance of result_class for query results.
+   */
   public function all($orderby = null, $count = null, $start = null, $indexby = null)
   {
     return $this->model->all($this->table_name, $orderby, $count, $start, $indexby);
   }
 
+  /**
+   * Calls the model controller's search method to find all records matching the
+   * criteria, ensuring that the records returned from the result set are
+   * wrapped in the model class.  The modeled table name is provided by default.
+   * 
+   * @param string $where Conditions for the WHERE clause of the select.
+   * @param array $values Bind values for WHERE clause.
+   * @param string $orderby Fields for the ORDER BY clause.
+   * @param int $count Number of records to return.  null = all
+   * @param int $start Index of first record to return.  null = 0
+   * @param string $indexby (NOT YET IMPLEMENTED)
+   * @return object An handler instance of result_class for query results.
+   */
   public function search($where = null, $values = null, $orderby = null, $count = null, $start = null, $indexby = null)
   {
     return $this->model->search($this->table_name, $where, $values, $orderby, $count, $start, $indexby);
   }
 
+  /**
+   * Calls the model controller's search method to find all records matching the
+   * criteria for a related table within the same database.
+   *
+   * @param string $table_name Table to query.
+   * @param string $where Conditions for the WHERE clause.
+   * @param string $values Bind values for WHERE clause.
+   * @param string $orderby Fields for the ORDER BY clause
+   * @return object An handler instance of result_class for query results.
+   */
   public function searchRelated($table_name, $where = null, $values = null, $orderby = null)
   {
     return $this->model->search($table_name, $where, $values, $orderby);
   }
-
-  public function queryRelated($table_name, $where, $values = null, $orderby = null)
-  {
-    return $this->model->query($table_name, $where, $values, $orderby);
-  }
 }
 
+/**
+ * A modeled version of the standard record wrapper.
+ */
 class SiteDatabaseModelRecord implements SiteDatabaseRecordWrapper {
+  /**
+   * Instance of modeled table handler class.
+   * @var object
+   */
   protected $table;
+  /**
+   * Assoc array of (column => value) pairs containing the row values.
+   * @var array
+   */
   protected $row;
+  /**
+   * Assoc array of (column => value) pairs containing any unsaved changes made
+   * to the row.
+   * @var array
+   */
   protected $changes;
+  /**
+   * Does this record tie to a record that already exists in the database?
+   * @var bool
+   */
   protected $exists;
+  /**
+   * Is this record fresh from the database?
+   * @var bool
+   */
   protected $dirty;
 
   /**
    * SiteDatabaseModelRecord constructor.
    *
-   * @param mixed $table SiteDatabaseModelTable (or derived) object
-   * @param mixed $row Assoc array of record values
-   * @param mixed $exists If the record exists in the DB already
-   * @param mixed $dirty $row Is fresh from the db (false) or not (true)
+   * @param mixed $table SiteDatabaseModelTable (or derived) object.
+   * @param mixed $row Assoc array of (column => value) pairs for the row to wrap.
+   * @param mixed $exists If the record exists in the DB already.
+   * @param mixed $dirty $row Is this record fresh from the database?
    */
   public function __construct($table, $row = null, $exists = false, $dirty = false)
   {
@@ -1325,6 +1496,12 @@ class SiteDatabaseModelRecord implements SiteDatabaseRecordWrapper {
     unset($this->row);
   }
 
+  /**
+   * Magical getter for the record column values.
+   *
+   * @param string $var Name of column.
+   * @return mixed Value contained in $var column, or null if not found.
+   */
   public function __get($var)
   {
     $this->freshen();
@@ -1346,18 +1523,36 @@ class SiteDatabaseModelRecord implements SiteDatabaseRecordWrapper {
     return $this->$var;
   }
 
+  /**
+   * Getter for entire row.
+   * 
+   * @return array Assoc array of (column => value) pairs for the row.
+   */
   public function getRow()
   {
     $this->freshen();
     return $this->row;
   }
 
+  /**
+   * Magical setter for the record column values.
+   *
+   * @param string $var Column name to assign to.
+   * @param mixed $val Value to store in the column.
+   * @return mixed The value assigned (for chaining).
+   */
   public function __set($var, $val)
   {
     return $this->changes[$var] = $val;
     //return $this->row[$var] = $val;
   }
 
+  /**
+   * Refreshes the internal row from the associated table record.
+   *
+   * @param bool $force Normally only freshens if $this->dirty.  This overrides
+   * that check.
+   */
   public function freshen($force = false)
   {
     if ($this->dirty || $force) {
@@ -1382,6 +1577,11 @@ class SiteDatabaseModelRecord implements SiteDatabaseRecordWrapper {
     $this->dirty = false;
   }
 
+  /**
+   * Returns the primary key in an assoc array of (column => value) pairs.
+   * 
+   * @return array Assoc array containing primary key.
+   */
   public function getKey()
   {
     $info = $this->table->getFieldInfo();
@@ -1407,6 +1607,12 @@ class SiteDatabaseModelRecord implements SiteDatabaseRecordWrapper {
     return $key;
   }
 
+  /**
+   * Updates the internal row values.
+   *
+   * @param array $row Assoc array of (column => value) pairs of columns to
+   * update.
+   */
   public function update($row)
   {
     foreach ($row as $var => $val) {
@@ -1414,6 +1620,9 @@ class SiteDatabaseModelRecord implements SiteDatabaseRecordWrapper {
     }
   }
 
+  /**
+   * Saves the internal row values to the associated database record.
+   */
   public function save()
   {
     if ($this->exists) {
@@ -1440,6 +1649,9 @@ class SiteDatabaseModelRecord implements SiteDatabaseRecordWrapper {
     $this->changes = array();
   }
 
+  /**
+   * Deletes the table record associated with the modeled row.
+   */
   public function delete()
   {
     $key = $this->getKey();
@@ -1458,6 +1670,12 @@ class SiteDatabaseModelRecord implements SiteDatabaseRecordWrapper {
     $this->dirty = false;
   }
 
+  /**
+   * Updates and saves at the same time.
+   *
+   * @param array $row Assoc array of (column => value) pairs of columns to
+   * update.
+   */
   public function updateAndSave($row)
   {
     $this->update($row);
